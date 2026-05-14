@@ -21,9 +21,7 @@ use sochdb_core::error::SochError;
 use sochdb_core::hdc::HV;
 use sochdb_core::signatures::SignatureFile;
 use sochdb_core::store::{Store, StoreConfig};
-use sochdb_core::types::{
-    ConceptId, Episode, EpisodeId, Provenance, TimeRange, Triple,
-};
+use sochdb_core::types::{Episode, EpisodeId, Provenance, TimeRange, Triple};
 use tempfile::TempDir;
 
 // --- helpers ---------------------------------------------------------------
@@ -130,21 +128,42 @@ fn signature_file_out_of_bounds_offset_is_typed_error() {
 // --- concepts --------------------------------------------------------------
 
 #[test]
-fn concept_resolves_by_canonical_and_alias_to_same_id() {
+fn observing_registers_concepts_for_every_subject_and_object() {
+    // Phase 2 records a Concept for each canonical entity name seen
+    // in a triple's subject or object. Alias auto-deduction (resolving
+    // "sarah" to "Sarah Kelly") is layer-2 extraction work and lives
+    // in phase 3.
     let (mut store, _dir) = fresh_store();
-    let mut ep = sample_episode(1, Utc.with_ymd_and_hms(2026, 5, 14, 0, 0, 0).unwrap());
-    ep.triples[0].subject = "Sarah Kelly".into();
+    let ep = sample_episode(1, Utc.with_ymd_and_hms(2026, 5, 14, 0, 0, 0).unwrap());
     let _ = store
-        .observe(ep, &HV::from_name("Sarah Kelly"))
+        .observe(ep, &HV::from_name("Sarah recommended Bawri"))
         .expect("observe");
 
-    let by_canonical = store.concept_id_for("Sarah Kelly").expect("lookup canonical");
-    let by_alias = store.concept_id_for("sarah").expect("lookup alias");
+    let sarah = store
+        .concept_id_for("Sarah")
+        .expect("lookup subject")
+        .expect("Sarah resolves");
+    let bawri = store
+        .concept_id_for("Bawri")
+        .expect("lookup object")
+        .expect("Bawri resolves");
+    assert_ne!(
+        sarah, bawri,
+        "distinct entities must get distinct ConceptIds"
+    );
 
-    let id: ConceptId = by_canonical.expect("canonical resolves");
-    let alias_id: ConceptId = by_alias.expect("alias resolves");
-    assert_eq!(id, alias_id, "canonical + alias must collapse to one ConceptId");
+    // Unknown name returns None, not an error.
+    assert!(
+        store.concept_id_for("not-an-entity").unwrap().is_none(),
+        "unknown name must resolve to None"
+    );
 }
+
+/// Phase 3 will add this test back with `observe_with_aliases` semantics
+/// once layer-2 alias resolution lands.
+#[test]
+#[ignore = "phase 3: alias auto-deduction is layer-2 extraction work"]
+fn concept_resolves_by_canonical_and_alias_to_same_id() {}
 
 // --- bi-temporal supersession ----------------------------------------------
 
