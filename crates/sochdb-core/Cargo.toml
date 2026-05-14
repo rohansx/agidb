@@ -1,0 +1,23 @@
+[package]
+name = "sochdb-core"
+description = "The sochdb engine: HDC kernel, redb metadata, mmap'd signatures, tiered recall."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+bincode = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
