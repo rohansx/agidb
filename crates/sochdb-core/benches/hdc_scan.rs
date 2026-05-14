@@ -34,9 +34,9 @@ fn make_random_corpus(n: usize, seed: u64) -> Vec<HV> {
 }
 
 fn bench_hamming_scan_100k(c: &mut Criterion) {
-    let corpus = make_random_corpus(SCAN_SIZE, 0x50CC_DBu64);
+    let corpus = make_random_corpus(SCAN_SIZE, 0x50CC_DB00_u64);
     let mut query_bytes = [0u8; D_BYTES];
-    StdRng::seed_from_u64(0xC0FF_EE).fill_bytes(&mut query_bytes);
+    StdRng::seed_from_u64(0xC0FF_EE00_u64).fill_bytes(&mut query_bytes);
     let query = HV(query_bytes);
 
     let mut group = c.benchmark_group("hdc_scan");
