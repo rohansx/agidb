@@ -35,10 +35,16 @@ chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
 
+# storage (phase 2)
+redb = "2"
+memmap2 = "0.9"
+roaring = "0.10"
+
 # dev / test / bench
 proptest = "1"
 criterion = { version = "0.5", features = ["html_reports"] }
 rand = "0.8"
+tempfile = "3"
 
 [profile.release]
 codegen-units = 1

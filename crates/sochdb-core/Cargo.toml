@@ -21,11 +21,15 @@ bincode = { workspace = true }
 chrono = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
+redb = { workspace = true }
+memmap2 = { workspace = true }
+roaring = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
 criterion = { workspace = true }
 rand = { workspace = true }
+tempfile = { workspace = true }
 
 [[bench]]
 name = "hdc_scan"
