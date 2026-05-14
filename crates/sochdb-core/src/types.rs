@@ -214,6 +214,104 @@ pub enum Tier {
     NearestNeighbor,
 }
 
+impl Tier {
+    /// Tier depth used for fall-through ordering. Lower depth = higher
+    /// quality; recall starts at depth 0 and descends until the depth
+    /// matches `tier_floor` or matches are found.
+    pub const fn depth(self) -> u8 {
+        match self {
+            Tier::Exact => 0,
+            Tier::Similarity => 1,
+            Tier::Gist => 2,
+            Tier::NearestNeighbor => 3,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Recall
+// ---------------------------------------------------------------------------
+
+/// A retrieval request. Only `cue` is required; the rest have defaults
+/// that match the v0.1 targets in [`crate::store`].
+#[derive(Clone, Debug)]
+pub struct Query {
+    /// Free-text cue. Tokenized for tier-A concept lookup and encoded
+    /// into a gist signature for tier-C/D fallback.
+    pub cue: String,
+    /// Maximum number of matches to return.
+    pub k: usize,
+    /// Bi-temporal "as-of" filter. Episodes whose valid_time does not
+    /// contain `as_of` are excluded.
+    pub as_of: Option<DateTime<Utc>>,
+    /// Confidence floor — matches below this are dropped.
+    pub min_confidence: f32,
+    /// Deepest tier the cascade is allowed to fall through to. Default
+    /// is [`Tier::NearestNeighbor`] (i.e. anything goes).
+    pub tier_floor: Tier,
+}
+
+impl Query {
+    /// Construct a query with sensible defaults: `k = 10`,
+    /// `min_confidence = 0.0`, `tier_floor = NearestNeighbor`.
+    pub fn cue(text: impl Into<String>) -> Self {
+        Self {
+            cue: text.into(),
+            k: 10,
+            as_of: None,
+            min_confidence: 0.0,
+            tier_floor: Tier::NearestNeighbor,
+        }
+    }
+
+    pub fn with_k(mut self, k: usize) -> Self {
+        self.k = k;
+        self
+    }
+
+    pub fn with_as_of(mut self, as_of: DateTime<Utc>) -> Self {
+        self.as_of = Some(as_of);
+        self
+    }
+
+    pub fn with_min_confidence(mut self, c: f32) -> Self {
+        self.min_confidence = c;
+        self
+    }
+
+    pub fn with_tier_floor(mut self, t: Tier) -> Self {
+        self.tier_floor = t;
+        self
+    }
+}
+
+/// The result of a recall. Per [constitution](../../.specify/memory/constitution.md)
+/// article VI, `Recall::matches` is never empty under the default
+/// `tier_floor`; the deepest tier always returns nearest neighbors.
+#[derive(Clone, Debug)]
+pub struct Recall {
+    pub matches: Vec<RecallMatch>,
+    /// The deepest tier that contributed at least one match.
+    pub tier_used: Tier,
+    /// Wall-clock elapsed time of the recall call, in milliseconds.
+    pub elapsed_ms: u32,
+}
+
+/// One row in a `Recall`. Tier-specific confidence calibration is
+/// applied by the tier that produced the match.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RecallMatch {
+    pub episode_id: EpisodeId,
+    pub text: String,
+    pub triples: Vec<Triple>,
+    pub confidence: f32,
+    pub valid_time: TimeRange,
+    pub provenance: Provenance,
+    /// `true` iff this episode has a `superseded_by` link set.
+    pub superseded: bool,
+    pub source_tier: Tier,
+}
+
 // ---------------------------------------------------------------------------
 // Tests — round-trip the schema invariants
 // ---------------------------------------------------------------------------
