@@ -1,0 +1,48 @@
+# rust
+target/
+**/*.rs.bk
+*.pdb
+Cargo.lock.bak
+
+# python (sochdb-py wheel builds + pyo3 dev)
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+*.whl
+*.so
+*.dylib
+*.pyd
+
+# onnx model caches (do not commit weights)
+.fastembed_cache/
+.cache/
+*.onnx
+
+# sochdb on-disk databases (test/scratch artifacts)
+*.soch/
+memory.soch/
+
+# illuminate MCP working directory
+.illuminate/
+
+# benchmark artifacts (logs ship in releases, raw runs are local)
+bench/results/**/raw/
+bench/scratch/
+
+# editors / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# logs and temp
+*.log
+.scratch/
+tmp/
