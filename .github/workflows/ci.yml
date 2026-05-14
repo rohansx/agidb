@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref so PR feedback stays fast.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Property tests run more cases when cycles are cheap (CI runners).
+  PROPTEST_CASES: 1024
+
+jobs:
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-latest:  portable path (and AVX-512 on hosted runners that support it)
+        # macos-14:       Apple silicon — exercises the NEON hamming path
+        # macos-13:       Intel macOS — second portable-path environment
+        os: [ubuntu-latest, macos-14, macos-13]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --workspace --all-targets
+      - run: cargo test --workspace --all-targets
+
+  # Benchmarks are gated to manual / scheduled runs only — they're too slow
+  # for every PR but we want a reproducible smoke run before each release.
+  bench-smoke:
+    name: bench (smoke)
+    runs-on: macos-14
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo bench (sochdb-core, target-cpu=native)
+        env:
+          RUSTFLAGS: "-C target-cpu=native"
+        run: cargo bench -p sochdb-core --bench hdc_scan -- --quick
