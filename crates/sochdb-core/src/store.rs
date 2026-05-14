@@ -110,7 +110,9 @@ impl Store {
         let db = Database::create(&db_path)?;
         let signatures = SignatureFile::open(&sig_path)?;
 
-        // Initialize / verify manifest.
+        // Initialize / verify manifest + create every table so later
+        // read-only transactions don't trip the "table does not exist"
+        // error on an empty store.
         {
             let tx = db.begin_write()?;
             {
@@ -136,6 +138,15 @@ impl Store {
                 if !has_counter {
                     manifest.insert(KEY_NEXT_CONCEPT_ID, encode(&1u64)?)?;
                 }
+                // Touch every table so it exists. redb materializes
+                // a table on the first open_table inside a write tx.
+                let _ = tx.open_table(EPISODES)?;
+                let _ = tx.open_table(CONCEPTS)?;
+                let _ = tx.open_table(CONCEPT_BY_NAME)?;
+                let _ = tx.open_multimap_table(CONCEPT_EPISODES)?;
+                let _ = tx.open_table(INVERTED_INDEX)?;
+                let _ = tx.open_table(SEMANTIC_ATOMS)?;
+                let _ = tx.open_table(CONSOLIDATION_LOG)?;
             }
             tx.commit()?;
         }

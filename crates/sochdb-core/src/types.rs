@@ -288,10 +288,15 @@ impl Query {
 /// The result of a recall. Per [constitution](../../.specify/memory/constitution.md)
 /// article VI, `Recall::matches` is never empty under the default
 /// `tier_floor`; the deepest tier always returns nearest neighbors.
+///
+/// `semantic_atoms` carries any consolidated `SemanticAtom` rows
+/// matching the cue's concept tokens — phase 6 surfaces these as a
+/// parallel result lane to the episodic matches.
 #[derive(Clone, Debug)]
 pub struct Recall {
     pub matches: Vec<RecallMatch>,
-    /// The deepest tier that contributed at least one match.
+    pub semantic_atoms: Vec<SemanticMatch>,
+    /// The shallowest tier that contributed at least one match.
     pub tier_used: Tier,
     /// Wall-clock elapsed time of the recall call, in milliseconds.
     pub elapsed_ms: u32,
@@ -310,6 +315,35 @@ pub struct RecallMatch {
     /// `true` iff this episode has a `superseded_by` link set.
     pub superseded: bool,
     pub source_tier: Tier,
+}
+
+/// A consolidated semantic atom surfaced as part of a `Recall`. Always
+/// carries the list of source `EpisodeId`s in `evidence` so callers
+/// can drill back to the verbatim observations behind the atom (per
+/// constitution article VII — provenance always).
+#[derive(Clone, Debug, PartialEq)]
+pub struct SemanticMatch {
+    pub atom_id: SemanticAtomId,
+    pub statement: String,
+    pub concept: ConceptId,
+    pub evidence: Vec<EpisodeId>,
+    pub evidence_count: u32,
+    pub confidence: f32,
+    pub last_referenced: DateTime<Utc>,
+}
+
+impl From<SemanticAtom> for SemanticMatch {
+    fn from(a: SemanticAtom) -> Self {
+        Self {
+            atom_id: a.id,
+            statement: a.statement,
+            concept: a.concept,
+            evidence: a.evidence,
+            evidence_count: a.evidence_count,
+            confidence: a.confidence,
+            last_referenced: a.last_referenced,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

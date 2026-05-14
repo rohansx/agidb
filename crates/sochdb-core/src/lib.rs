@@ -12,6 +12,7 @@
 //!
 //! See `docs/architecture/` and `docs/phases/` for the build plan.
 
+pub mod consolidate;
 pub mod episode;
 pub mod error;
 pub mod hdc;

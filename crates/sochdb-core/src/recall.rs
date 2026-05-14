@@ -18,7 +18,7 @@
 
 use crate::episode::{encode_gist_signature, encode_query_signature, tokenize};
 use crate::error::{Result, SochError};
-use crate::store::{Store, EPISODES};
+use crate::store::{Store, EPISODES, SEMANTIC_ATOMS};
 use crate::types::*;
 use redb::ReadableTable;
 use std::collections::HashSet;
@@ -37,9 +37,14 @@ impl Store {
     /// Run a recall against the store. Per the constitution, never
     /// returns an empty `Recall::matches` under the default `tier_floor`
     /// of `NearestNeighbor`.
+    ///
+    /// `Recall::semantic_atoms` also carries any consolidated atoms
+    /// whose anchoring concept matches a cue token — this is how phase
+    /// 6 surfaces consolidated knowledge alongside raw episodes.
     pub fn recall(&self, query: &Query) -> Result<Recall> {
         let started = Instant::now();
         let matches = self.run_cascade(query)?;
+        let semantic_atoms = self.semantic_atoms_for_cue(query)?;
         let tier_used = matches
             .iter()
             .map(|m| m.source_tier)
@@ -48,9 +53,38 @@ impl Store {
         let elapsed_ms = started.elapsed().as_millis().min(u32::MAX as u128) as u32;
         Ok(Recall {
             matches,
+            semantic_atoms,
             tier_used,
             elapsed_ms,
         })
+    }
+
+    /// Look up every `SemanticAtom` whose anchoring concept matches a
+    /// token in the cue. O(N) over atoms today; a concept→atoms
+    /// inverted index is a phase-6 follow-up.
+    fn semantic_atoms_for_cue(&self, query: &Query) -> Result<Vec<SemanticMatch>> {
+        let mut wanted: HashSet<ConceptId> = HashSet::new();
+        for token in tokenize(&query.cue) {
+            if let Some(cid) = self.concept_id_for(&token)? {
+                wanted.insert(cid);
+            }
+        }
+        if wanted.is_empty() {
+            return Ok(Vec::new());
+        }
+        let tx = self.db.begin_read()?;
+        let table = tx.open_table(SEMANTIC_ATOMS)?;
+        let mut out = Vec::new();
+        for entry in table.iter()? {
+            let (_, v) = entry?;
+            let bytes = v.value();
+            let atom: SemanticAtom = bincode::deserialize(&bytes)
+                .map_err(|e| SochError::Internal(format!("decode atom: {e}")))?;
+            if wanted.contains(&atom.concept) {
+                out.push(SemanticMatch::from(atom));
+            }
+        }
+        Ok(out)
     }
 
     fn run_cascade(&self, query: &Query) -> Result<Vec<RecallMatch>> {
