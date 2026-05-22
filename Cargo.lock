@@ -3,6 +3,97 @@
 version = 4
 
 [[package]]
+name = "agidb"
+version = "0.1.0-dev"
+dependencies = [
+ "agidb-core",
+ "agidb-extract",
+]
+
+[[package]]
+name = "agidb-bench"
+version = "0.1.0-dev"
+dependencies = [
+ "agidb-core",
+ "agidb-extract",
+ "anyhow",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "agidb-cli"
+version = "0.1.0-dev"
+dependencies = [
+ "agidb-core",
+ "agidb-extract",
+ "anyhow",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "agidb-core"
+version = "0.1.0-dev"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "chrono",
+ "criterion",
+ "memmap2",
+ "proptest",
+ "rand 0.8.6",
+ "redb",
+ "roaring",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "agidb-extract"
+version = "0.1.0-dev"
+dependencies = [
+ "agidb-core",
+ "anyhow",
+ "chrono",
+ "serde",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "agidb-mcp"
+version = "0.1.0-dev"
+dependencies = [
+ "agidb-core",
+ "agidb-extract",
+ "anyhow",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "agidb-py"
+version = "0.1.0-dev"
+dependencies = [
+ "agidb-core",
+ "agidb-extract",
+ "anyhow",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -996,97 +1087,6 @@ name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
-
-[[package]]
-name = "sochdb"
-version = "0.1.0-dev"
-dependencies = [
- "sochdb-core",
- "sochdb-extract",
-]
-
-[[package]]
-name = "sochdb-bench"
-version = "0.1.0-dev"
-dependencies = [
- "anyhow",
- "serde",
- "serde_json",
- "sochdb-core",
- "sochdb-extract",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "sochdb-cli"
-version = "0.1.0-dev"
-dependencies = [
- "anyhow",
- "sochdb-core",
- "sochdb-extract",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "sochdb-core"
-version = "0.1.0-dev"
-dependencies = [
- "anyhow",
- "async-trait",
- "bincode",
- "chrono",
- "criterion",
- "memmap2",
- "proptest",
- "rand 0.8.6",
- "redb",
- "roaring",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "sochdb-extract"
-version = "0.1.0-dev"
-dependencies = [
- "anyhow",
- "chrono",
- "serde",
- "sochdb-core",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "sochdb-mcp"
-version = "0.1.0-dev"
-dependencies = [
- "anyhow",
- "serde",
- "serde_json",
- "sochdb-core",
- "sochdb-extract",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "sochdb-py"
-version = "0.1.0-dev"
-dependencies = [
- "anyhow",
- "sochdb-core",
- "sochdb-extract",
-]
 
 [[package]]
 name = "socket2"

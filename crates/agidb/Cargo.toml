@@ -1,0 +1,20 @@
+[package]
+name = "agidb"
+description = "Embedded, content-addressable memory database for AI agents. Umbrella crate that re-exports agidb-core and agidb-extract."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "../../README.md"
+keywords = ["memory", "agent", "embedded", "hyperdimensional", "database"]
+categories = ["database-implementations", "data-structures"]
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+agidb-core = { workspace = true }
+agidb-extract = { workspace = true }

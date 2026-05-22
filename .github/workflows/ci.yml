@@ -66,7 +66,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: cargo bench (sochdb-core, target-cpu=native)
+      - name: cargo bench (agidb-core, target-cpu=native)
         env:
           RUSTFLAGS: "-C target-cpu=native"
-        run: cargo bench -p sochdb-core --bench hdc_scan -- --quick
+        run: cargo bench -p agidb-core --bench hdc_scan -- --quick

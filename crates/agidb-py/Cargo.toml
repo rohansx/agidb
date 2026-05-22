@@ -1,0 +1,20 @@
+[package]
+name = "agidb-py"
+description = "Python bindings for agidb via pyo3. Builds the `agidb` python wheel."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+# crate-type = ["cdylib"] is added in phase 5 when pyo3 lands
+
+[dependencies]
+agidb-core = { workspace = true }
+agidb-extract = { workspace = true }
+anyhow = { workspace = true }

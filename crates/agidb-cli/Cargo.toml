@@ -1,0 +1,22 @@
+[package]
+name = "agidb-cli"
+description = "Command-line interface for agidb (open, observe, recall, consolidate, export, import)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "agidb"
+path = "src/main.rs"
+
+[dependencies]
+agidb-core = { workspace = true }
+agidb-extract = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true }

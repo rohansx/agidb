@@ -1,13 +1,13 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/sochdb",
-    "crates/sochdb-core",
-    "crates/sochdb-extract",
-    "crates/sochdb-cli",
-    "crates/sochdb-mcp",
-    "crates/sochdb-py",
-    "crates/sochdb-bench",
+    "crates/agidb",
+    "crates/agidb-core",
+    "crates/agidb-extract",
+    "crates/agidb-cli",
+    "crates/agidb-mcp",
+    "crates/agidb-py",
+    "crates/agidb-bench",
 ]
 
 [workspace.package]
@@ -15,13 +15,13 @@ version = "0.1.0-dev"
 edition = "2021"
 rust-version = "1.89"
 license = "Apache-2.0"
-repository = "https://github.com/sochdb/sochdb"
-homepage = "https://sochdb.dev"
-authors = ["sochdb contributors"]
+repository = "https://github.com/agidb/agidb"
+homepage = "https://agidb.dev"
+authors = ["agidb contributors"]
 
 [workspace.dependencies]
-sochdb-core = { path = "crates/sochdb-core", version = "0.1.0-dev" }
-sochdb-extract = { path = "crates/sochdb-extract", version = "0.1.0-dev" }
+agidb-core = { path = "crates/agidb-core", version = "0.1.0-dev" }
+agidb-extract = { path = "crates/agidb-extract", version = "0.1.0-dev" }
 
 # core
 anyhow = "1"

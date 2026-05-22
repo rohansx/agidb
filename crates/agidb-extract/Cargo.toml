@@ -1,0 +1,21 @@
+[package]
+name = "agidb-extract"
+description = "GLiNER ONNX entity/relation extraction for agidb. The scaffolding layer (Layer 2)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+agidb-core = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+chrono = { workspace = true }
