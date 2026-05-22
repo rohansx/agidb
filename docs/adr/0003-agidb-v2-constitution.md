@@ -58,10 +58,11 @@ change; the constitution must move with it.
 The constitution's own *"Amendments since sochdb v1"* section is the canonical,
 in-document changelog and is kept current there.
 
-This ADR covers the **constitution and documentation** only. The code rename
-(`sochdb-*` crates → `agidb-*`, error types, manifest strings, namespaces) is a
-separate, tracked **pre-week-0** task on the roadmap and is *not* enacted here —
-the docs now say "agidb"; the crates still say "sochdb" until that task runs.
+This ADR covers the **constitution and documentation**. The code rename
+(`sochdb-*` crates → `agidb-*`, the `AgidbError` error type, the signature magic
+bytes, namespaces) is the separate **pre-week-0** task on the roadmap; it was
+carried out immediately after this ADR. Documentation and code are now both on
+the agidb name.
 
 ## Consequences
 
@@ -73,9 +74,9 @@ the docs now say "agidb"; the crates still say "sochdb" until that task runs.
 - The constitution is longer (18 articles vs 14); contributors have more to read,
   but the amendment log makes the v1→v2 delta auditable at a glance.
 - The constitution version is now **2.1**, last amended 2026-05-20.
-- A naming gap is created on purpose: documentation uses "agidb", code uses
-  "sochdb". This is tracked and time-boxed by the pre-week-0 rebrand task; it is
-  not drift.
+- Documentation and code are both on the **agidb** name: the docs were
+  reconciled first and the crate rename followed immediately after, so no
+  naming gap persists.
 
 ## Alternatives considered
 

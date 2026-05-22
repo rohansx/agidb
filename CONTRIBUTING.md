@@ -1,8 +1,6 @@
 # Contributing to agidb
 
 > Before anything else, read [`.specify/memory/constitution.md`](./.specify/memory/constitution.md). Every Core Principle is binding; violations require an ADR amendment, not a workaround.
->
-> **Naming:** the project is **agidb** (v2). The crates on disk are still named `sochdb-*` pending the pre-week-0 rename — see [ADR-0003](./docs/adr/0003-agidb-v2-constitution.md). The `cargo` commands and `crates/` paths below use the current `sochdb-*` names; substitute when the rename lands.
 
 ## Quick links
 
@@ -38,10 +36,10 @@ Per [constitution article on testing](./.specify/memory/constitution.md), all ne
 ```bash
 # Red — write a property test in tests/<feature>_properties.rs
 # It must compile and fail. Confirm:
-cargo test -p sochdb-core <test_name>   # expect FAILED
+cargo test -p agidb-core <test_name>   # expect FAILED
 
 # Green — implement the minimum to pass
-cargo test -p sochdb-core <test_name>   # expect ok
+cargo test -p agidb-core <test_name>   # expect ok
 
 # Refactor — clean up, keep tests green
 cargo clippy --workspace --all-targets -- -D warnings
@@ -63,7 +61,7 @@ Every public performance or accuracy claim ships with **all six metrics** — BL
 
 Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`.
 
-Scope is optional but useful: `feat(sochdb-core): …`, `docs(phases): …`, `chore(ci): …`.
+Scope is optional but useful: `feat(agidb-core): …`, `docs(phases): …`, `chore(ci): …`.
 
 Subject line ≤ 70 chars. Body explains *why*, not *what* — the diff already shows the what.
 
@@ -83,12 +81,12 @@ If your change touches any of the Core Principles in the constitution — adding
 | Public API spec | `docs/spec/tech-spec.md` |
 | Glossary | `CONTEXT.md` |
 | Decision records | `docs/adr/` |
-| Engine code | `crates/sochdb-core/src/` |
-| Extraction code | `crates/sochdb-extract/src/` |
-| MCP server | `crates/sochdb-mcp/src/` |
-| Python bindings | `crates/sochdb-py/src/` |
-| CLI | `crates/sochdb-cli/src/` |
-| Benchmark harness | `crates/sochdb-bench/src/` |
+| Engine code | `crates/agidb-core/src/` |
+| Extraction code | `crates/agidb-extract/src/` |
+| MCP server | `crates/agidb-mcp/src/` |
+| Python bindings | `crates/agidb-py/src/` |
+| CLI | `crates/agidb-cli/src/` |
+| Benchmark harness | `crates/agidb-bench/src/` |
 | Property tests | `crates/<crate>/tests/` |
 | Benches | `crates/<crate>/benches/` |
 | Per-repo agent config | `docs/agents/` |

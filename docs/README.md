@@ -5,10 +5,6 @@
 >
 > docs are organized into four tracks. start with **product** if you're new, **architecture** if you're integrating, **spec** if you're contributing code, **phases** if you're tracking the build.
 
-> **Naming:** these docs describe **agidb v2**. the code in `crates/` still uses the
-> `sochdb-*` names from v1 — the crate/namespace rename is the pre-week-0 task on the
-> [roadmap](./product/roadmap.md). docs lead, code follows.
-
 ## reading paths
 
 | if you are... | read in this order |

@@ -2,11 +2,9 @@
 
 > agidb is a cognitive substrate for autonomous AI agents — content-addressable hyperdimensional memory with first-class goals and beliefs, bi-temporal supersession, sleep-like consolidation, and a non-destructive unlearn primitive. Rust top to bottom, single binary, no query language. See [`README.md`](./README.md) for the user-facing pitch, [`docs/README.md`](./docs/README.md) for the doc tree, and [`.specify/memory/constitution.md`](./.specify/memory/constitution.md) for the immutable principles.
 
-## Naming (transitional)
+## Naming
 
-The project is **agidb v2** — an expansion of sochdb v1 (see [ADR-0003](./docs/adr/0003-agidb-v2-constitution.md)). All documentation uses the name **agidb**. The code does not yet: the crates under `crates/` are still named `sochdb-*` (`sochdb-core`, `sochdb-extract`, …). Renaming the crates, error types, manifest strings, and namespaces is the **pre-week-0** task in [`docs/product/roadmap.md`](./docs/product/roadmap.md).
-
-Until that task runs: write **agidb** in docs and prose; use the **actual `sochdb-*` crate names** when referring to or importing code. The gap is intentional and tracked — not drift.
+agidb was formerly **sochdb v1** (see [ADR-0003](./docs/adr/0003-agidb-v2-constitution.md)). The crate rename is complete: all workspace crates are `agidb-*` (`agidb-core`, `agidb-extract`, …) and the error type is `AgidbError`. The local checkout directory may still be named `sochdb` — that is cosmetic and affects nothing.
 
 ## Before changing anything
 
@@ -43,7 +41,7 @@ This project uses GitHub Spec-Kit. The constitution is canonical at [`.specify/m
 
 ## House rules
 
-- **Rust top to bottom in the core crate** (`sochdb-core`, renaming to `agidb-core`). No Python or JavaScript. ONNX runtime via `ort` is the only permitted FFI.
+- **Rust top to bottom in `agidb-core`.** No Python or JavaScript. ONNX runtime via `ort` is the only permitted FFI.
 - **No LLM in the read path.** `recall`, `what_about`, `between`, `recall_procedure` must be deterministic. (Constitution Article IV, amended for v2: LLMs are permitted at *write* time for belief revision and consolidation only.)
 - **Test-first.** Property tests for HDC algebra, unit tests for each crate, integration tests for the public API. CI runs unit + property on every PR.
 - **Benchmark honestly.** Every public claim ships with the full six-metric stack (BLEU + F1 + LLM-judge + token cost + p95 latency + noisy-cue) and raw logs.

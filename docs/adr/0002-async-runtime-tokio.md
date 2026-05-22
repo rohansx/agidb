@@ -6,7 +6,7 @@
 
 ## Context
 
-sochdb's public API is async (`async fn observe`, `async fn recall`, `async fn consolidate`, etc.) per the `Memory` trait in [`docs/spec/tech-spec.md`](../spec/tech-spec.md). The async runtime choice cascades into every dependency — tokio-compatible crates are not always async-std-compatible and vice versa.
+agidb's public API is async (`async fn observe`, `async fn recall`, `async fn consolidate`, etc.) per the `Memory` trait in [`docs/spec/tech-spec.md`](../spec/tech-spec.md). The async runtime choice cascades into every dependency — tokio-compatible crates are not always async-std-compatible and vice versa.
 
 The candidates:
 
@@ -17,7 +17,7 @@ The candidates:
 
 ## Decision
 
-**Use tokio as the canonical async runtime across all sochdb crates.** Configure it via:
+**Use tokio as the canonical async runtime across all agidb crates.** Configure it via:
 
 ```toml
 tokio = { version = "1", features = ["full"] }
@@ -27,10 +27,10 @@ at the workspace level. All member crates depend on `tokio` via the workspace in
 
 ## Consequences
 
-- Users of sochdb must run inside a tokio runtime. This is the dominant rust async pattern in 2026; effectively no friction for the target audience.
-- The MCP server (`sochdb-mcp`) inherits tokio for the MCP protocol async handlers — matches `mcp-rust-sdk` expectations.
-- The python bindings (`sochdb-py`) use `pyo3-asyncio` with the tokio runtime, the most-tested combination.
-- The benchmark harness (`sochdb-bench`) can use tokio's `JoinSet` for parallel baseline runs.
+- Users of agidb must run inside a tokio runtime. This is the dominant rust async pattern in 2026; effectively no friction for the target audience.
+- The MCP server (`agidb-mcp`) inherits tokio for the MCP protocol async handlers — matches `mcp-rust-sdk` expectations.
+- The python bindings (`agidb-py`) use `pyo3-asyncio` with the tokio runtime, the most-tested combination.
+- The benchmark harness (`agidb-bench`) can use tokio's `JoinSet` for parallel baseline runs.
 - We lose the option to be runtime-agnostic. If a future consumer needs async-std, we'll need a compatibility shim — accepted cost.
 
 ## Alternatives considered

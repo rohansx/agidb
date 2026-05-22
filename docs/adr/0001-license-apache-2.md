@@ -6,7 +6,7 @@
 
 ## Context
 
-sochdb is an open-source library distributed via crates.io, PyPI, and an MCP server binary. It needs a license that:
+agidb is an open-source library distributed via crates.io, PyPI, and an MCP server binary. It needs a license that:
 
 1. Lets external developers embed it in commercial agent products without contagion clauses
 2. Provides a patent grant so contributors and downstream users are protected
@@ -15,7 +15,7 @@ sochdb is an open-source library distributed via crates.io, PyPI, and an MCP ser
 
 ## Decision
 
-License the entire sochdb codebase under **Apache-2.0**, declared in:
+License the entire agidb codebase under **Apache-2.0**, declared in:
 
 - `LICENSE` at the repo root (canonical text from `apache.org`)
 - `license = "Apache-2.0"` in `Cargo.toml` `[workspace.package]`, inherited by every member crate via `license.workspace = true`
@@ -25,14 +25,14 @@ License the entire sochdb codebase under **Apache-2.0**, declared in:
 - Commercial use is unrestricted (no copyleft).
 - Contributors automatically grant patent rights to the project.
 - The hosted tier (when it ships in v1.0+) can be a separate proprietary product on top of an unchanged Apache-2.0 engine, without dual-licensing or relicensing.
-- Apache-2.0 is incompatible with GPLv2-only consumers — sochdb cannot be statically linked into GPLv2-only projects. This is acceptable; the target market is permissive-license agent frameworks.
+- Apache-2.0 is incompatible with GPLv2-only consumers — agidb cannot be statically linked into GPLv2-only projects. This is acceptable; the target market is permissive-license agent frameworks.
 - We commit to including the `NOTICE` file convention if/when third-party Apache-2.0 code is vendored.
 
 ## Alternatives considered
 
 - **MIT** — simpler text, no patent grant. Rejected because the patent grant is a meaningful safety net for an embedded-db project that may attract patent trolls.
 - **BSL (Business Source License)** — used by Sentry, MariaDB. Rejected because it complicates downstream use and is unusual in the rust embedded-db ecosystem (redb, lancedb, qdrant are all Apache-2.0 or MIT).
-- **AGPL** — strongest copyleft. Rejected because it would discourage adoption by commercial agent products, which is sochdb's primary distribution path.
+- **AGPL** — strongest copyleft. Rejected because it would discourage adoption by commercial agent products, which is agidb's primary distribution path.
 - **Dual MIT/Apache-2.0** (rust standard for many libs) — slightly more permissive for consumers. Rejected for simplicity; one license is one fewer thing to explain.
 
 ## References
