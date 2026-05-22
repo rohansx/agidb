@@ -26,7 +26,7 @@
 //! is stored in the header so a reopen knows the true HV count even
 //! when the file has unused tail capacity.
 
-use crate::error::{Result, AgidbError};
+use crate::error::{AgidbError, Result};
 use crate::hdc::{D_BYTES, HV};
 use memmap2::MmapMut;
 use std::fs::{File, OpenOptions};

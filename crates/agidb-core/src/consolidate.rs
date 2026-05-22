@@ -20,7 +20,7 @@
 //! [`crate::store::CONSOLIDATION_LOG`] so the audit trail is durable
 //! and queryable.
 
-use crate::error::{Result, AgidbError};
+use crate::error::{AgidbError, Result};
 use crate::hdc::HV;
 use crate::store::{ConsolidationLogEntry, Store, CONSOLIDATION_LOG, MANIFEST, SEMANTIC_ATOMS};
 use crate::types::*;
@@ -197,10 +197,7 @@ impl Store {
         Ok(created)
     }
 
-    fn detect_and_supersede_contradictions(
-        &mut self,
-        episodes: &[(Episode, HV)],
-    ) -> Result<u32> {
+    fn detect_and_supersede_contradictions(&mut self, episodes: &[(Episode, HV)]) -> Result<u32> {
         // Group every triple by (subject, predicate). Each group with
         // ≥ 2 entries is a candidate for supersession — the rule is
         // "same subject + predicate but different object across
@@ -303,10 +300,7 @@ struct TripleSlot {
 /// into the same cluster, repeat. O(N²) worst case; good enough for
 /// the phase-6 entry. A locality-sensitive hash (LSH) pre-filter
 /// lives in the phase-6 follow-up.
-fn cluster_by_similarity(
-    episodes: &[(Episode, HV)],
-    skip: &HashSet<EpisodeId>,
-) -> Vec<Vec<usize>> {
+fn cluster_by_similarity(episodes: &[(Episode, HV)], skip: &HashSet<EpisodeId>) -> Vec<Vec<usize>> {
     let mut clusters: Vec<Vec<usize>> = Vec::new();
     let mut assigned: HashSet<usize> = HashSet::new();
     for i in 0..episodes.len() {

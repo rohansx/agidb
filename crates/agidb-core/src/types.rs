@@ -73,7 +73,10 @@ pub struct TimeRange {
 
 impl TimeRange {
     pub fn point(t: DateTime<Utc>) -> Self {
-        Self { start: t, end: None }
+        Self {
+            start: t,
+            end: None,
+        }
     }
 
     /// `true` iff `at` is inside `[start, end)`.

@@ -21,4 +21,4 @@ pub mod signatures;
 pub mod store;
 pub mod types;
 
-pub use error::{Result, AgidbError};
+pub use error::{AgidbError, Result};

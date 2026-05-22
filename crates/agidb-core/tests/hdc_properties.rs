@@ -8,8 +8,8 @@
 //! When implementing phase 1, the goal is to turn every panic in this
 //! file into a green test without weakening any invariant.
 
+use agidb_core::hdc::{D, D_BYTES, HV};
 use proptest::prelude::*;
-use agidb_core::hdc::{HV, D, D_BYTES};
 
 /// Strategy for generating a fully arbitrary `HV` — 1024 random bytes
 /// with no structural assumptions. Property tests use this to cover

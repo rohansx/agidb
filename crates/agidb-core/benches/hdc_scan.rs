@@ -16,9 +16,9 @@
 //! first iteration — that's expected; the bench exists to lock in the
 //! exit criterion once implementation begins.
 
+use agidb_core::hdc::{D_BYTES, HV};
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
-use agidb_core::hdc::{HV, D_BYTES};
 
 const SCAN_SIZE: usize = 100_000;
 

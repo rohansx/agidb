@@ -64,9 +64,7 @@ impl HV {
         // measurable speedup at the bind site.
         let a = self.as_u64s();
         let b = other.as_u64s();
-        let dst = unsafe {
-            std::slice::from_raw_parts_mut(out.as_mut_ptr() as *mut u64, D_U64)
-        };
+        let dst = unsafe { std::slice::from_raw_parts_mut(out.as_mut_ptr() as *mut u64, D_U64) };
         for ((d, &ai), &bi) in dst.iter_mut().zip(a.iter()).zip(b.iter()) {
             *d = ai ^ bi;
         }
@@ -132,9 +130,7 @@ impl HV {
     pub fn hamming(&self, other: &HV) -> u32 {
         #[cfg(target_arch = "x86_64")]
         {
-            if is_x86_feature_detected!("avx512vpopcntdq")
-                && is_x86_feature_detected!("avx512f")
-            {
+            if is_x86_feature_detected!("avx512vpopcntdq") && is_x86_feature_detected!("avx512f") {
                 // SAFETY: feature presence verified above.
                 return unsafe { hamming_avx512(self, other) };
             }
@@ -263,7 +259,7 @@ unsafe fn hamming_neon(a: &HV, b: &HV) -> u32 {
         let bv = vld1q_u8(bp.add(i * 16));
         let xor = veorq_u8(av, bv);
         let pc = vcntq_u8(xor); // 16 × u8 popcounts, each 0..=8
-        // Widen + pair-sum into u16 lanes to avoid overflow.
+                                // Widen + pair-sum into u16 lanes to avoid overflow.
         let pc16 = vpaddlq_u8(pc); // 8 × u16 from pair-summed u8s
         acc = vaddq_u16(acc, pc16);
     }

@@ -17,7 +17,7 @@
 //! recall never returns the empty set under the default `tier_floor`.
 
 use crate::episode::{encode_gist_signature, encode_query_signature, tokenize};
-use crate::error::{Result, AgidbError};
+use crate::error::{AgidbError, Result};
 use crate::store::{Store, EPISODES, SEMANTIC_ATOMS};
 use crate::types::*;
 use redb::ReadableTable;

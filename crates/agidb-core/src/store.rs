@@ -4,7 +4,7 @@
 //! lives here; HVs themselves live in [`crate::signatures`] and are
 //! referenced by `signature_offset`.
 
-use crate::error::{Result, AgidbError};
+use crate::error::{AgidbError, Result};
 use crate::hdc::{D_BYTES, HV};
 use crate::signatures::SignatureFile;
 use crate::types::*;
@@ -117,9 +117,7 @@ impl Store {
             let tx = db.begin_write()?;
             {
                 let mut manifest = tx.open_table(MANIFEST)?;
-                let stored_version = manifest
-                    .get(KEY_FORMAT_VERSION)?
-                    .map(|v| v.value());
+                let stored_version = manifest.get(KEY_FORMAT_VERSION)?.map(|v| v.value());
                 match stored_version {
                     Some(bytes) => {
                         let stored: u32 = decode(&bytes)?;
@@ -201,7 +199,9 @@ impl Store {
                     // any mutating call on the same table — redb's
                     // AccessGuard borrows the table immutably and would
                     // collide with the next insert otherwise.
-                    let existing = concept_by_name.get(entity_name.as_str())?.map(|v| v.value());
+                    let existing = concept_by_name
+                        .get(entity_name.as_str())?
+                        .map(|v| v.value());
                     let concept_id = match existing {
                         Some(raw) => ConceptId::new(raw),
                         None => {
@@ -317,8 +317,7 @@ impl Store {
             let mut older_ep: Episode = decode(&older_bytes)?;
 
             older_ep.superseded_by = Some(newer);
-            older_ep.valid_time.end =
-                Some(newer_ep.valid_time.start - Duration::milliseconds(1));
+            older_ep.valid_time.end = Some(newer_ep.valid_time.start - Duration::milliseconds(1));
 
             episodes.insert(older.raw(), encode(&older_ep)?)?;
         }
@@ -403,9 +402,7 @@ fn decode<T: for<'de> serde::Deserialize<'de>>(bytes: &[u8]) -> Result<T> {
 
 /// Read-modify-write the monotonic concept-id counter inside the
 /// caller's open write transaction.
-fn next_concept_id(
-    manifest: &mut redb::Table<&str, Vec<u8>>,
-) -> Result<ConceptId> {
+fn next_concept_id(manifest: &mut redb::Table<&str, Vec<u8>>) -> Result<ConceptId> {
     let raw = manifest.get(KEY_NEXT_CONCEPT_ID)?.map(|v| v.value());
     let current: u64 = match raw {
         Some(bytes) => decode(&bytes)?,

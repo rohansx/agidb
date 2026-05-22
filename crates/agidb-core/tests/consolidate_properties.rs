@@ -3,13 +3,11 @@
 //! Cluster + atom creation + contradiction detection. Decay and
 //! compaction are deferred so they don't appear here.
 
-use chrono::{Duration, TimeZone, Utc};
 use agidb_core::consolidate::{ConsolidationReport, MIN_EVIDENCE};
 use agidb_core::episode::encode_episode_signature;
 use agidb_core::store::{Store, StoreConfig, CONSOLIDATION_LOG};
-use agidb_core::types::{
-    Episode, EpisodeId, Provenance, Query, TimeRange, Triple,
-};
+use agidb_core::types::{Episode, EpisodeId, Provenance, Query, TimeRange, Triple};
+use chrono::{Duration, TimeZone, Utc};
 use tempfile::TempDir;
 
 // --- helpers ---------------------------------------------------------------
@@ -132,7 +130,10 @@ fn consolidate_writes_a_log_entry() {
     let tx = store.db.begin_read().expect("begin read");
     let table = tx.open_table(CONSOLIDATION_LOG).expect("open log");
     let count = table.iter().expect("iter").count();
-    assert_eq!(count, 1, "consolidate() should append exactly one log entry");
+    assert_eq!(
+        count, 1,
+        "consolidate() should append exactly one log entry"
+    );
 }
 
 // --- contradiction detection -----------------------------------------------
@@ -177,9 +178,7 @@ fn consolidated_atom_surfaces_in_recall_via_concept_token() {
     let r = store.consolidate().expect("consolidate");
     assert_eq!(r.semantic_atoms_created, 1);
 
-    let recall = store
-        .recall(&Query::cue("Sarah"))
-        .expect("recall");
+    let recall = store.recall(&Query::cue("Sarah")).expect("recall");
     assert_eq!(
         recall.semantic_atoms.len(),
         1,

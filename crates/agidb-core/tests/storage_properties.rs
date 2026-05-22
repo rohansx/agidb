@@ -16,12 +16,12 @@
 //! - Tier-A exact recall respects `as_of` time
 //! - `export_jsonl` → fresh store + `import_jsonl` round-trips
 
-use chrono::{Duration, TimeZone, Utc};
 use agidb_core::error::AgidbError;
 use agidb_core::hdc::HV;
 use agidb_core::signatures::SignatureFile;
 use agidb_core::store::{Store, StoreConfig};
 use agidb_core::types::{Episode, EpisodeId, Provenance, TimeRange, Triple};
+use chrono::{Duration, TimeZone, Utc};
 use tempfile::TempDir;
 
 // --- helpers ---------------------------------------------------------------
@@ -224,7 +224,9 @@ fn recall_exact_filters_by_as_of_time() {
         .expect("concept exists");
 
     let at_mid = store.recall_exact(concept, Some(mid)).expect("recall mid");
-    let at_after = store.recall_exact(concept, Some(after)).expect("recall after");
+    let at_after = store
+        .recall_exact(concept, Some(after))
+        .expect("recall after");
 
     assert!(
         at_mid.iter().any(|e| e.id == older_id),
@@ -248,7 +250,9 @@ fn export_then_import_roundtrips_episodes() {
     let t = Utc.with_ymd_and_hms(2026, 5, 14, 0, 0, 0).unwrap();
     for i in 0..5 {
         let ep = sample_episode(100 + i, t + Duration::seconds(i as i64));
-        store_a.observe(ep, &HV::from_name(&format!("e{i}"))).unwrap();
+        store_a
+            .observe(ep, &HV::from_name(&format!("e{i}")))
+            .unwrap();
     }
     let mut jsonl = Vec::new();
     store_a.export_jsonl(&mut jsonl).expect("export");
@@ -256,9 +260,7 @@ fn export_then_import_roundtrips_episodes() {
     drop(dir_a);
 
     let (mut store_b, _dir_b) = fresh_store();
-    let imported = store_b
-        .import_jsonl(jsonl.as_slice())
-        .expect("import");
+    let imported = store_b.import_jsonl(jsonl.as_slice()).expect("import");
     assert_eq!(imported, 5, "imported count must match exported");
     for i in 0..5 {
         let ep = store_b
