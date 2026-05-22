@@ -1,147 +1,234 @@
-# sochdb Constitution
+# agidb — Constitution
 
-> Immutable principles that govern every decision in sochdb. If a feature, dependency, or design choice contradicts the constitution, it is out of scope. Amendments require an explicit ADR in `docs/adr/`.
+> The immutable principles governing every decision in agidb. Inherited from
+> sochdb v1's 14 articles, extended with 3 new articles for the v2.0 AGI
+> substrate pivot, plus 1 new article for the v2.1 brain-alignment milestone.
+> Anything that contradicts the constitution requires an ADR.
 
-## Core Principles
+**Status:** ratified · **Version:** 2.1 · **Last amended:** 2026-05-20
 
-### I. The One-Liner
+## Preamble
 
-sochdb is **an embedded, content-addressable memory database for AI agents — storage and retrieval share the same hyperdimensional representation, bi-temporal by default, with automatic consolidation. One binary, one API, no query language.**
+agidb is the cognitive substrate for autonomous AI agents. The choices that make it different from other databases — content-addressable HDC retrieval, bi-temporal supersession, no LLM in the read path, first-class cognitive primitives, non-destructive unlearn, brain-aligned multimodal sensory — are not feature decisions. They are architectural commitments that compound over time. Once violated, they cannot be unviolated.
 
-If a proposed feature does not reinforce this one-liner, it does not ship.
+These 18 articles are the principles that govern every design and engineering decision. Changes to the constitution require an ADR and a documented justification. The constitution survives leadership changes, funding rounds, and pressure to compromise.
 
-### II. The Wedge (NON-NEGOTIABLE)
+---
 
-sochdb integrates binding and recall without an external index — storage and retrieval share the same representation, so retrieval doesn't detour through a separate vector or graph lookup. This is the non-negotiable architectural commitment.
+## Article I — The one-liner is non-negotiable
 
-Violations:
-- Introducing a separate vector index (pgvector, qdrant, lancedb) as a primary read path
-- Introducing a separate graph store (neo4j, kuzu) as a primary read path
-- Requiring an LLM call on the read path
+agidb is **the cognitive substrate for autonomous AI agents — content-addressable hyperdimensional memory, first-class goals and beliefs, bi-temporal supersession, sleep-like consolidation, and a non-destructive unlearn primitive. One Rust binary, one API, no query language.**
 
-### III. Embedded-First, Forever
+Marketing may rephrase. Documentation may elaborate. The one-liner does not change. If a proposed feature does not fit the one-liner, it does not belong in agidb.
 
-sochdb is a library that runs in the user's process. Like sqlite, not like postgres.
-- Single binary, no server
-- Works fully offline by default
-- Zero required network calls at read or write time
-- No required API keys
-- A hosted tier is permitted **only as an optional v1.0+ deployment mode**; the embedded engine must remain the canonical product
+---
 
-### IV. No LLM in the Read Path
+## Article II — No external index for retrieval
 
-`recall()`, `what_about()`, `between()`, `recall_procedure()` must complete with zero LLM invocations.
+Storage and retrieval share the **same representation**. agidb does not ship a separate vector index for retrieval, a separate graph index for relations, a separate keyword index for text. The HDC signature is the index. The inverted-bit map is the index. Memories are retrieved by bit-overlap counting over the same signatures that store them.
 
-LLMs are permitted only:
-- Optionally, at write time, behind an explicit feature flag, for extraction enrichment
-- In the eval harness, never in the production path
+This is the architectural wedge. Without this, agidb is just another vector DB with extra steps.
 
-### V. Bi-Temporal Supersession Over Destructive Update
+---
 
-Every fact has `t_valid_start`, `t_valid_end`, `t_tx_start`. Contradictions supersede, never overwrite. The answer to "what did we believe about X on date Y?" must always be answerable.
+## Article III — Embedded-first forever
 
-### VI. Never Return Empty
+agidb is a single Rust binary that runs locally. No required server, no required cloud, no required API keys for the core path. The embedded form is canonical.
 
-`recall()` returns matches at one of four tiers: exact → similarity → gist → nearest-neighbor. Confidence is always explicit. A query never returns the empty set — it returns the nearest neighbors with `low_confidence=true`.
+A hosted tier may exist for enterprise customers in v0.4+, but it must be strictly additive — the OSS embedded engine stays free, complete, and self-hostable. Anything that requires hosting to function is out of scope.
 
-### VII. Provenance Always
+---
 
-Every claim sochdb makes traces back to a verbatim source observation. Opaque embeddings as the only provenance are forbidden. Consolidated semantic atoms must link back to their source episode IDs.
+## Article IV — No LLM in the read path
 
-### VIII. Rust Top to Bottom
+`recall()` is deterministic math over stored signatures. No LLM call, no embedding API, no network round-trip. Read latency is a function of CPU and disk only.
 
-The engine is Rust. Bindings (Python via pyo3, MCP) wrap the Rust engine. No Python or JavaScript in `sochdb-core`.
+**Amendment for v2 (new):** LLMs may participate at write time for belief revision and consolidation when semantic judgment is required beyond pure HDC math. Belief revision benefits from an LLM's ability to assess whether new evidence genuinely contradicts an old belief. Semantic atom creation may use an LLM to summarize clusters. **The read path remains LLM-free.**
 
-Permitted exceptions: ONNX runtime (`ort` crate) and tokenizers — both already pure-Rust wrappers.
+**Clarification for v2.1:** sensory encoders (V-JEPA 2, Wav2Vec-BERT, Llama-3.2-3B) at write time are *not* LLM calls in the constitutional sense. They are frozen feature extractors run locally via ONNX or Candle. No network calls. No tokens billed. The encoders are part of layer 2 (extraction), not part of inference/reasoning. They are deterministic feature engineering on raw modalities.
 
-Forbidden: GC-language reimplementations of core paths, async-std (use tokio), C++ deps when a Rust equivalent exists.
+---
 
-### IX. No Query Language
+## Article V — Bi-temporal supersession, never overwrite
 
-Users call functions. They don't write SQL, Cypher, JSON-path, or any custom DSL. If a feature requires a query language, it's the wrong feature.
+Every fact has four timestamps: `t_valid_start`, `t_valid_end`, `t_tx_start`, `t_tx_end`. Updates produce new rows; old rows are marked `superseded_by`. Nothing is silently overwritten. Queries can ask "what was true at time T?" (valid-time) and "what did I know at time T?" (transaction-time) — they are different questions with different answers.
 
-### X. Benchmark Honestly (NON-NEGOTIABLE)
+This is how legal and financial systems track changing facts. It is how human memory tracks contradicting information. agidb mirrors both.
 
-Every public performance or accuracy claim is reproducible from a published harness with raw logs. No cherry-picked single numbers. The standard reporting stack is **BLEU + F1 + LLM-judge (binary) + token cost + p95 latency**, plus a noisy-cue degradation test. Raw logs and the harness commit hash ship with every claim.
+---
 
-### XI. Small Core, Composable Surface
+## Article VI — Never return the empty set
 
-The public API is the `Memory` trait: `observe`, `observe_procedure`, `recall`, `recall_procedure`, `what_about`, `between`, `consolidate`, `close`. Additions require an ADR. Removals require a major version.
+`recall()` never returns `[]`. It returns a result with a `tier_used` field indicating how good the match was: `Exact` / `Similarity` / `Gist` / `NearestNeighbor`. If nothing matches above the floor, return the best available with `low_confidence: true`.
 
-### XII. Non-Goals Are Sacred
+Agents must always get *something* and the confidence to know how much to trust it. Returning nothing forces the agent into error-handling paths that don't reflect how cognition actually works.
 
-These are explicitly **not** sochdb and never will be in v0.x:
-- A general-purpose database
-- A transactional store for orders/users/payments
-- A full-text search engine over documents
-- A pure similarity search over fixed embeddings
-- A hosted-only service
-- A multimodal store (text-first; v0.3+ may add image/audio)
-- A distributed/sharded database
-- A knowledge graph editor with a UI
-- A fine-tuning service
-- A query language
+---
 
-If a customer needs one of these, the answer is "use the right tool, then sochdb on top."
+## Article VII — Full provenance, always
 
-### XIII. The Decision Gate Is Binding
+Every claim agidb makes traces back to the verbatim observation that produced it. Every belief has a `revision_log`. Every semantic atom has `source_episodes`. Every recall result includes a `provenance` field with source, session_id, trace_id.
 
-At week 12, the project commits, repositions, or retreats based on the published thresholds in `docs/phases/phase-7-decision-gate.md`. The gate is not negotiable.
+No opaque embeddings. No untraceable facts. No "the model said so." If agidb cannot show its work, the work doesn't ship.
 
-### XIV. Respect Existing ctxgraph Code
+---
 
-Vendor what's reusable from ctxgraph (GLiNER ONNX loading, predicate canonicalization, alias resolution). Do not rewrite for the sake of rewriting. Do not block on ctxgraph parity — sochdb can advance independently.
+## Article VIII — Rust top to bottom
 
-## Additional Constraints
+`agidb-core` is pure Rust. The only permitted FFI is ONNX runtime via the `ort` crate (for GLiNER in v2.0, V-JEPA 2 + Wav2Vec-BERT in v2.1) and Candle for pure-Rust ML inference where available. No Python bridges, no C++ engines, no JNI, no node-native modules in the core path. Python bindings exist via pyo3 for the user-facing API; the engine is Rust.
 
-### Performance Targets
+This is what gives agidb its sub-50ms p95 latency, its single-binary deployment, and its lack of GC pauses. Negotiable language choices invite negotiable performance.
 
-sochdb is held to user-perceivable performance contracts at v0.1, measured on the benchmark laptop (Apple M2 or Intel i7-12700H, 16 GB RAM, NVMe SSD):
+---
 
-- `recall` p95 ≤ 50ms on 100k-episode store
-- `observe` p95 ≤ 200ms
-- 8192-bit hamming-distance scan over 100k signatures ≤ 5ms (AVX-512 or NEON path)
-- Binary size ≤ 60 MB rust-stripped, no LLM weights
-- Memory footprint at idle ≤ 80 MB (mmap doesn't count toward RSS)
+## Article IX — No query language
 
-Full table in `docs/spec/tech-spec.md` § Performance Targets.
+agidb has no SQL, no Cypher, no GraphQL, no DSL. The public API is a small set of Rust functions exposed through bindings: `observe`, `observe_multimodal`, `recall`, `set_goal`, `assert_belief`, `unlearn`, `consolidate`, `what_about`, `between`, `what_did_i_learn`, `attention_trace`.
 
-### Benchmark Suite
+Query languages assume the user knows the schema. Agents don't. Agents say what they want; agidb figures out how to retrieve it.
 
-Every public release runs the full three-benchmark suite — **LongMemEval-S + LoCoMo + BEAM** — against pinned baselines (Mem0, Zep/Graphiti, Letta) and publishes all six metrics with raw logs. No single-number claims. See `docs/phases/phase-7-decision-gate.md` for the decision thresholds.
+---
 
-### Dependency Constraints
+## Article X — Benchmark honestly
 
-Pure-Rust dependencies wherever a Rust equivalent exists. C/C++ FFI only when no viable Rust crate ships (e.g., ONNX runtime via `ort`). LLM SDKs (`openai`, `anthropic`) forbidden in `sochdb-core`; permitted in `sochdb-extract` only behind a feature flag.
+Every performance or accuracy claim must be reproducible. Every benchmark run publishes raw logs, the harness commit hash, and the full six-metric stack (BLEU + F1 + LLM-judge + token cost + p95 latency + noisy-cue degradation) **plus** the cognitive benchmark results (goal consistency, belief revision, unlearn cascade, multi-floor retrieval).
 
-## Development Workflow
+**Extension for v2.1:** BAMS benchmark scores are published alongside the standard suite. RSA scores across all six functional cortical networks (DMN, visual, auditory, language, dorsal attention, frontoparietal) are reported. No cherry-picking individual networks. Calibration data and TRIBE v2 version pinned in every BAMS report.
 
-### Phase Gating
+No cherry-picking. No single-number claims. No "trust us, it's fast." If a comparison cannot be reproduced from the published harness, it does not appear in marketing.
 
-The build is organized into phases 0-8 (see `docs/phases/`). A phase exits only when its exit criterion is met on a reproducible benchmark. Partial implementations do not exit a phase.
+---
 
-### Test-First Discipline
+## Article XI — Small, composable API surface
 
-All new behavior begins with a failing test. Property tests via `proptest` for HDC algebra invariants, supersession, and confidence monotonicity. Unit tests for each crate. Integration tests for the public API surface. CI runs unit + property tests on every PR; benchmarks are gated to nightly.
+The public API of agidb is small enough to fit on a single screen. Every method is composable with every other method. New methods require a constitutional justification (this article); they are added rarely.
 
-### Code Review
+Featurism is a slow death. agidb is the database for autonomous agents, not the database that does everything for everyone.
 
-Every change goes through review against this constitution. PRs that violate a Core Principle are rejected and routed to an ADR discussion.
+---
 
-### ADRs for Amendments
+## Article XII — Sacred non-goals
 
-Architectural decisions and constitutional amendments are recorded in `docs/adr/`. Each ADR documents: what the old principle said, what the new principle says, what concrete decision forced the change, and what consequences follow. Amendments are dated and cannot retroactively reinterpret prior commitments.
+agidb is **not** and will never be:
 
-## Governance
+- a general-purpose database (use postgres)
+- a full-text search engine (use elasticsearch)
+- a pure vector-similarity store (use pinecone)
+- a hosted-only service (the OSS engine is always complete)
+- a multimodal-document store (use lancedb)
+- a distributed sharded database (use cockroach + a vector DB)
+- a knowledge-graph editor with a UI (use neo4j browser)
+- a fine-tuning service (use replicate or runpod)
+- a brain-decoding service (TRIBE v2 weights are CC BY-NC, agidb uses TRIBE for *evaluation* only, never as a product feature decoding individual users' brains)
+- AGI itself (agidb is the substrate AGI runs on)
 
-This constitution supersedes all other practices and conventions within the sochdb codebase. PRs and reviews must verify compliance with every Core Principle that touches the change. Complexity must be justified — preferably in an ADR.
+Pressure to expand into any of these will be persistent. The answer is no. Pick a different tool for those problems.
 
-Amendments require:
-1. An ADR in `docs/adr/` proposing the change
-2. Approval logged on the ADR
-3. Migration plan for any code or docs affected
-4. Update to this constitution with an incremented version
+---
 
-Use `docs/spec/tech-spec.md` for runtime development guidance and the per-phase docs in `docs/phases/` for week-by-week milestones.
+## Article XIII — The binding decision gate
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-14 | **Last Amended**: 2026-05-14
+At phase 7 (week 12 of the v2.0 build), agidb runs the benchmark harness against Mem0, Zep/Graphiti, and Letta. The result is one of three binding outcomes:
+
+- **Commit** — the numbers justify launch + v2.1 + fundraise. Proceed to phase 8 + v2.1 phases 14-16.
+- **Reposition** — the numbers don't beat the incumbents but the embedded/cost angle still has a market. Ship as "agidb-lite," skip the seed round, skip v2.1 brain-alignment work, iterate.
+- **Retreat** — the numbers don't justify the bet. Fold the learnings back into ctxgraph (sochdb's predecessor), retire the agidb name.
+
+The decision gate is binding. No "let's give it another quarter." No moving the thresholds. The harness is committed by week 8; the thresholds are committed by week 10; the decision is made by week 13.
+
+**v2.1 dependency rule:** v2.1 brain-alignment work (phases 14-16) is gated on the week-12 decision gate outcome being "Commit." If "Reposition" or "Retreat," v2.1 is canceled. No partial-credit ship of brain-alignment without substrate credibility first.
+
+---
+
+## Article XIV — Respect existing code
+
+agidb v2 inherits sochdb v1's working code: phases 0, 1, 2, 4, 6 complete, 44 tests passing, ~13 commits. Every line of that code carries forward. The HDC kernel, the redb storage layer, the bi-temporal model, the episode encoder, the four-tier recall, the consolidation worker — all preserved.
+
+When v2 adds capabilities, it adds them on top of v1's substrate, not by rewriting. The discipline of red-green test-first development from sochdb continues unchanged in agidb. Refactors that touch v1 code require ADRs.
+
+---
+
+## Article XV — Cognitive primitives are first-class types (new in v2.0)
+
+Goals, beliefs, sensory frames, learning events, and unlearn targets are first-class Rust types with their own storage, retrieval, and audit semantics. They are not text fields inside episodes. They are not JSON blobs. They have:
+
+- typed shapes in `types.rs` or dedicated modules
+- redb tables with explicit schemas
+- API methods with documented contracts
+- property tests covering invariants
+
+If a future contributor proposes "let's just store goals as JSON text," the answer is no. The whole point of the v2 pivot is that goals and beliefs are typed substrate primitives.
+
+---
+
+## Article XVI — Unlearn is non-destructive at audit (new in v2.0)
+
+The `unlearn()` API removes facts from active retrieval and cascades through dependencies. Tombstoned data is recoverable for 30 days. After that, the data itself may be compacted away — but **the audit log entry recording the unlearn is permanent**.
+
+Even after full compaction, agidb can answer: "was anything unlearned in the last year, and why?" The right-to-be-forgotten removes the data; it does not remove the *fact that data was removed*. This is what makes unlearn trustworthy.
+
+**Extension for v2:** unlearn also subtracts from the self-vector (floor 7). Tombstoning the rows is not enough — the self-model EMA still contains a contribution from the unlearned episodes. Real unlearn means recomputing the self-vector with the tombstoned signatures subtracted. Otherwise the agent still "remembers" the unlearned concept as a centroid contamination in its self-model.
+
+---
+
+## Article XVII — Beliefs are revisable, never overwritten (new in v2.0)
+
+When new evidence arrives that affects a belief's confidence, the belief is **revised**, not mutated. A `BeliefRevision` entry is appended to the revision_log capturing:
+
+- `timestamp`
+- `previous_confidence` and `new_confidence`
+- `triggering_evidence` (the EpisodeId that caused the revision)
+- `reason` (a brief human-readable explanation)
+
+This means: the agent can always answer "what did I believe last week, and what changed my mind?" Belief revision is a special case of article V (bi-temporal supersession), specialized for the belief floor. Belief revision math may use an LLM at write time (per article IV amendment), but the revision log itself is structured data, not free text.
+
+---
+
+## Article XVIII — Brain-alignment is empirical and additive (new in v2.1)
+
+v2.1 ships multimodal sensory encoding via V-JEPA 2 + Wav2Vec-BERT + Llama-3.2-3B and the BAMS benchmark. The constitutional commitments are:
+
+1. **Brain-alignment is empirical, not metaphorical.** We do not claim agidb "thinks like a brain." We claim agidb's internal representations align with TRIBE-predicted cortical activations on matched stimuli, measurable via RSA across six functional networks. The claim is falsifiable via BAMS evaluation.
+
+2. **Brain-alignment is additive, not constitutive.** The substrate works without it (v2.0 ships text-only). v2.1 is the brain-aligned expansion. If brain-alignment turns out to be unhelpful empirically, v2.2+ can deprioritize it without breaking the substrate.
+
+3. **TRIBE v2 is used for evaluation, not as a product feature.** We do not decode user brains. We do not ship TRIBE weights inside agidb. We use TRIBE v2 as published, frozen, for one purpose: scoring BAMS. CC BY-NC of TRIBE v2 weights means agidb's BAMS harness is research-licensed; the core substrate remains Apache-2.0.
+
+4. **The encoder stack matches TRIBE v2 for alignment.** V-JEPA 2 Gigantic-256 for video, Wav2Vec-BERT 2.0 for audio, Llama-3.2-3B for text. Using the same encoders is what makes BAMS evaluation meaningful. Swapping encoders (e.g. to whisper for audio) requires re-running BAMS calibration and is an ADR-level decision.
+
+5. **HDC projection is training-free.** Charikar 2002 thresholded random projection from encoder latents to 8192-bit signatures. Seed-fixed. Deterministic. No learned quantization in v2.1. Learned quantization may be considered in v2.2+ only if BAMS plateaus with the random projection.
+
+6. **VSA binding remains factorable.** Multimodal fusion is via XOR role-filler binding, not attention. This is what lets agidb factor a stored episode signature back into its component modality signatures — something attention-based fusion cannot do. Factorability is the structural advantage over TRIBE's attention fusion and over mem0/letta/zep dense embeddings.
+
+7. **BAMS scores ship with every release.** Once v2.1 ships, every subsequent release reports BAMS scores against the previous version. A regression in BAMS is a release-blocker unless explicitly justified by an ADR.
+
+---
+
+## Enforcement
+
+Articles I-XII and XV-XVIII govern the public-facing product and its commitments. Articles XIII and XIV govern internal discipline.
+
+When a proposed change conflicts with an article:
+1. Write an ADR explaining the conflict
+2. Justify why the change is necessary
+3. Propose an amendment to the article OR demonstrate the change does not actually conflict
+4. Get the amendment approved or the change rejected
+
+Constitutional changes are not made by code review. They are made by ADR.
+
+## Amendments since sochdb v1
+
+- **Article IV amended** for v2.0: LLMs allowed at write time for belief revision and consolidation; read path stays LLM-free.
+- **Article IV clarified** for v2.1: V-JEPA 2 / Wav2Vec-BERT / Llama-3.2-3B as frozen feature extractors are not LLM calls in the constitutional sense.
+- **Article XII extended** for v2.1: brain-decoding service added to sacred non-goals.
+- **Article XIII extended** for v2.1: v2.1 work gated on week-12 decision gate "Commit" outcome.
+- **Article XV added** for v2.0: cognitive primitives as first-class typed shapes.
+- **Article XVI added** for v2.0: non-destructive unlearn with permanent audit. **Extended for v2** with self-vector subtraction requirement.
+- **Article XVII added** for v2.0: belief revision with explicit revision log.
+- **Article XVIII added** for v2.1: brain-alignment is empirical and additive.
+
+Articles I, II, III, V, VI, VII, VIII, IX, X, XI, XIV are inherited from sochdb v1, with article X extended for BAMS reporting.
+
+---
+
+*The constitution is the longest-lived document in agidb. Code rots; tests get refactored; benchmarks become obsolete. The principles persist.*

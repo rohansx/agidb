@@ -1,609 +1,824 @@
-# sochdb — technical specification
+# agidb — Technical Specification
 
-this document specifies the rust API, the core types, error handling, performance targets, and dependencies for sochdb v0.1.
+> The full Rust API. Types, traits, methods, error model, performance
+> targets. The reference document for anyone implementing against agidb,
+> embedding it, or contributing to the engine. Covers v2.0 + v2.1.
 
-audience: contributors and integrators. assumes familiarity with rust, async, and embedded databases.
+**Status:** v2.0 substrate API stabilizing at month 9. v2.1 multimodal API stabilizing at month 12. Pre-1.0 — APIs are not yet semver-stable.
 
-## crate organization
-
-```
-sochdb (workspace)
-├── sochdb-core         # the engine: HDC kernel, redb, mmap, recall
-├── sochdb-extract      # GLiNER ONNX wrapper, triple extraction
-├── sochdb-cli          # the `sochdb` binary
-├── sochdb-mcp          # MCP server
-├── sochdb-py           # pyo3 python bindings
-└── sochdb-bench        # benchmark harness against Mem0, Zep, Letta
-```
-
-users typically depend on `sochdb` (the umbrella crate that re-exports the public API of `sochdb-core` and `sochdb-extract`).
-
-## the public API
-
-### opening a database
+## Overview
 
 ```rust
-use sochdb::{Sochdb, Config};
+use agidb::{Agidb, Query, Goal, Belief, ObserveContext};
+use agidb::sensory::{VideoClip, AudioClip};  // v2.1
 
-let db = Sochdb::open("./memory.soch").await?;
+#[tokio::main]
+async fn main() -> agidb::Result<()> {
+    let db = Agidb::open("./memory.agidb").await?;
 
-// or with config
-let db = Sochdb::builder()
-    .path("./memory.soch")
-    .signature_dim(8192)
-    .extractor(Extractor::GLiNER)
-    .consolidation_interval(Duration::from_secs(300))
-    .strict_mode(false)
-    .build()
-    .await?;
-```
+    // v2.0 — text observation
+    db.observe("Sarah recommended Bawri", ObserveContext::default()).await?;
 
-`open` creates the database if it doesn't exist. it's idempotent.
+    // v2.1 — multimodal observation
+    db.observe_multimodal(
+        Some(VideoClip::from_file("dinner.mp4")?),
+        Some(AudioClip::from_file("dinner.wav")?),
+        Some("sarah recommended Bawri".into()),
+        ObserveContext::default(),
+    ).await?;
 
-### the `Memory` trait
+    // v2.0 — first-class goals
+    let goal = db.set_goal(Goal::new("find a thai place for the team dinner")).await?;
 
-the core API surface, implemented by `Sochdb`:
+    // v2.0 — first-class beliefs
+    db.assert_belief(
+        Belief::new("Sarah likes thai food").with_confidence(0.8)
+    ).await?;
 
-```rust
-#[async_trait]
-pub trait Memory: Send + Sync {
-    /// observe a new fact or event. returns an EpisodeId for provenance.
-    async fn observe(&self, text: &str, opts: ObserveOpts) -> Result<EpisodeId>;
+    // v2.0 — unified recall (goal-biased automatically)
+    let recall = db.recall(Query::cue("what thai place did sarah mention?")).await?;
 
-    /// observe a procedure (workflow / skill). procedural memory.
-    async fn observe_procedure(&self, proc: Procedure) -> Result<EpisodeId>;
+    // v2.1 — brain-aligned memory similarity score
+    let bams = db.bams_self_score().await?;
 
-    /// retrieve memories matching a partial cue. never returns empty.
-    /// returns both episodic matches and semantic atoms.
-    async fn recall(&self, query: Query) -> Result<Recall>;
-
-    /// retrieve procedures whose trigger matches the cue. procedural memory.
-    async fn recall_procedure(&self, cue: &str, k: usize) -> Result<Vec<ProcedureMatch>>;
-
-    /// fetch everything sochdb knows about a concept, optionally as-of a time.
-    async fn what_about(&self, subject: &str, as_of: Option<DateTime<Utc>>)
-        -> Result<EntityView>;
-
-    /// find paths between two concepts up to N hops.
-    async fn between(&self, a: &str, b: &str, max_hops: u8) -> Result<Vec<Path>>;
-
-    /// run the consolidation worker synchronously. returns stats.
-    async fn consolidate(&self) -> Result<ConsolidationReport>;
-
-    /// flush in-memory state to disk and release locks.
-    async fn close(self) -> Result<()>;
+    Ok(())
 }
 ```
 
-### `observe()` in detail
+## Public crate structure
+
+```
+agidb (umbrella) — re-exports the public API
+├── agidb-core         the engine: HDC, redb, mmap, recall, consolidation,
+│                      goals, beliefs, sensory, self-model, unlearn
+├── agidb-extract      GLiNER ONNX wrapper, triple + belief extraction
+├── agidb-sensory      v2.1: V-JEPA 2 + Wav2Vec-BERT + Llama-3.2-3B encoders,
+│                            HDC projection, multimodal binding
+├── agidb-ns           neurosymbolic translation layer
+├── agidb-skills       procedural execution traces, skill runtime
+├── agidb-cli          the `agidb` binary
+├── agidb-mcp          MCP server
+├── agidb-py           pyo3 Python bindings
+├── agidb-bench        benchmark harness (LongMemEval/LoCoMo/BEAM + cognitive)
+└── agidb-bams         v2.1: BAMS benchmark suite, six-network RSA, baselines
+```
+
+MSRV: Rust 1.89. License: Apache-2.0 (core), CC BY-NC for BAMS artifacts (TRIBE v2 weights).
+
+## Core types
+
+### Identifiers
 
 ```rust
-pub struct ObserveOpts {
-    pub valid_time: Option<TimeRange>,
-    pub provenance: Option<Provenance>,
-    pub strict: bool,
+pub struct EpisodeId(pub u64);
+pub struct ConceptId(pub u64);
+pub struct AtomId(pub u64);
+pub struct GoalId(pub u64);
+pub struct BeliefId(pub u64);
+pub struct ProcedureId(pub u64);
+pub struct SensoryId(pub u64);
+pub struct LearningEventId(pub u64);
+pub struct AuditId(pub u64);
+pub struct RecallId(pub u64);
+pub struct SelfVectorSnapshotId(pub u64);  // v2.1
+pub struct SessionId(pub Uuid);
+```
+
+### Hypervector
+
+```rust
+#[repr(align(64))]
+pub struct HV {
+    pub bits: [u64; 128],   // 8192 bits = 1024 bytes
+}
+
+impl HV {
+    pub fn zero() -> Self;
+    pub fn from_seed(seed: &[u8; 32]) -> Self;
+    pub fn from_name(name: &str) -> Self;
+    pub fn random<R: Rng>(rng: &mut R) -> Self;
+    pub fn bind(&self, other: &HV) -> HV;       // XOR
+    pub fn hamming(&self, other: &HV) -> u32;    // POPCOUNT
+    pub fn similarity(&self, other: &HV) -> f32; // 1 - hamming/8192
+    pub fn active_dims(&self) -> u32;
+    pub fn set_bit(&mut self, idx: u32);
+    pub fn clear_bit(&mut self, idx: u32);
+    pub fn get_bit(&self, idx: u32) -> bool;
+    pub fn set_bits(&self) -> impl Iterator<Item = u32>;
+    pub fn subtract(&self, other: &HV, alpha: f32) -> HV;  // v2: for self-vector
+}
+
+pub fn bundle(hvs: &[HV]) -> HV;   // per-bit majority
+pub fn bind_pair(a: &HV, b: &HV) -> HV;
+```
+
+### Domain types (inherited)
+
+```rust
+pub struct Episode {
+    pub id: EpisodeId,
+    pub text: String,
+    pub triples: Vec<Triple>,
+    pub signature: HV,
+    pub gist_signature: HV,
+    pub provenance: Provenance,
+    pub confidence: f32,
+    pub t_valid_start: DateTime<Utc>,
+    pub t_valid_end: Option<DateTime<Utc>>,
+    pub t_tx_start: DateTime<Utc>,
+    pub t_tx_end: Option<DateTime<Utc>>,
+    pub superseded_by: Option<EpisodeId>,
+    pub tombstoned_at: Option<DateTime<Utc>>,
+    pub session_id: Option<SessionId>,
+    // v2.1
+    pub modalities: Vec<Modality>,
+    pub modality_signatures: Option<MultimodalSignatures>,
+}
+
+pub struct Triple {
+    pub subject: ConceptId,
+    pub predicate: String,
+    pub object: Value,
+    pub confidence: f32,
+    pub source_episode: Option<EpisodeId>,
+}
+
+pub enum Value {
+    Concept(ConceptId),
+    Text(String),
+    Number(f64),
+    Date(DateTime<Utc>),
+}
+
+pub struct Concept {
+    pub id: ConceptId,
+    pub canonical_name: String,
+    pub aliases: Vec<String>,
+    pub concept_type: ConceptType,
+    pub signature: HV,
+    pub created_at: DateTime<Utc>,
+    pub withdrawn_at: Option<DateTime<Utc>>,
+}
+
+pub struct SemanticAtom {
+    pub id: AtomId,
+    pub subject: ConceptId,
+    pub predicate: String,
+    pub object: Value,
+    pub signature: HV,
+    pub evidence_count: u32,
+    pub source_episodes: Vec<EpisodeId>,
+    pub t_valid_start: DateTime<Utc>,
+    pub t_valid_end: Option<DateTime<Utc>>,
+    pub confidence: f32,
+    pub last_referenced: DateTime<Utc>,
 }
 
 pub struct Provenance {
-    pub source: String,       // "user", "agent", "tool:gmail", etc.
-    pub session_id: Option<String>,
+    pub source: String,
+    pub session_id: Option<SessionId>,
     pub trace_id: Option<String>,
-    pub metadata: HashMap<String, Value>,
+    pub metadata: HashMap<String, String>,
+}
+
+pub struct TimeRange {
+    pub start: DateTime<Utc>,
+    pub end: Option<DateTime<Utc>>,
 }
 ```
 
-example:
+### v2.0 cognitive types
 
 ```rust
-let id = db.observe(
-    "Sarah recommended Bawri in Bandra last weekend",
-    ObserveOpts {
-        valid_time: None,           // let the extractor figure it out
-        provenance: Some(Provenance {
-            source: "user".into(),
-            session_id: Some("sess_abc123".into()),
-            trace_id: None,
-            metadata: hashmap! {},
-        }),
-        strict: false,
+pub struct Goal {
+    pub id: GoalId,
+    pub parent_id: Option<GoalId>,
+    pub description: String,
+    pub state: GoalState,
+    pub success_criteria: Vec<SuccessCriterion>,
+    pub deadline: Option<DateTime<Utc>>,
+    pub signature: HV,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub provenance: Provenance,
+}
+
+pub enum GoalState {
+    Active,
+    Paused { since: DateTime<Utc>, reason: String },
+    Completed { at: DateTime<Utc>, evidence: Vec<EpisodeId> },
+    Abandoned { at: DateTime<Utc>, reason: String },
+}
+
+pub struct Belief {
+    pub id: BeliefId,
+    pub claim: String,
+    pub subject: ConceptId,
+    pub predicate: String,
+    pub object: Value,
+    pub confidence: f32,
+    pub evidence: Vec<EpisodeId>,
+    pub contradictions: Vec<EpisodeId>,
+    pub revision_log: Vec<BeliefRevision>,
+    pub signature: HV,
+    pub t_valid_start: DateTime<Utc>,
+    pub t_valid_end: Option<DateTime<Utc>>,
+    pub t_tx_start: DateTime<Utc>,
+    pub t_tx_end: Option<DateTime<Utc>>,
+    pub provenance: Provenance,
+    pub withdrawn_at: Option<DateTime<Utc>>,
+}
+
+pub struct BeliefRevision {
+    pub timestamp: DateTime<Utc>,
+    pub previous_confidence: f32,
+    pub new_confidence: f32,
+    pub triggering_evidence: Option<EpisodeId>,
+    pub reason: String,
+    pub llm_used: bool,
+    pub llm_model: Option<String>,
+}
+
+pub struct SensoryFrame {
+    pub id: SensoryId,
+    pub modality: Modality,
+    pub data: SensoryData,
+    pub received_at: DateTime<Utc>,
+    pub surprise_score: f32,
+    pub promoted_to: Option<EpisodeId>,
+}
+
+pub enum Modality {
+    Text,
+    Image { path: PathBuf },
+    Audio { path: PathBuf, duration_ms: u32 },
+    Video { path: PathBuf, frame_count: u32, fps: f32 },
+    Multimodal { components: Vec<Modality> },  // v2.1
+}
+
+pub enum SensoryData {
+    InlineText(String),
+    BlobRef(PathBuf),
+    InlineLatent { encoder: EncoderId, latent: Vec<f32> },  // v2.1
+}
+
+pub enum LearningEvent {
+    EpisodeStored { id: EpisodeId, at: DateTime<Utc> },
+    MultimodalEpisodeStored { id: EpisodeId, modalities: Vec<Modality>, at: DateTime<Utc> },
+    GoalStateChanged { id: GoalId, from: GoalState, to: GoalState, at: DateTime<Utc> },
+    BeliefAsserted { id: BeliefId, claim: String, confidence: f32, at: DateTime<Utc> },
+    BeliefRevised { id: BeliefId, revision: BeliefRevision },
+    BeliefWithdrawn { id: BeliefId, reason: String, at: DateTime<Utc> },
+    SensoryFramePromoted { sensory_id: SensoryId, episode_id: EpisodeId, surprise: f32 },
+    SemanticAtomFormed { atom_id: AtomId, source_episodes: Vec<EpisodeId>, at: DateTime<Utc> },
+    ContradictionDetected { atoms: Vec<AtomId>, at: DateTime<Utc> },
+    Unlearned {
+        target: UnlearnTarget,
+        cascade_size: usize,
+        self_vector_drift: u32,
+        audit_id: AuditId,
+        at: DateTime<Utc>,
     },
-).await?;
+    AttentionTraced { recall_id: RecallId, signatures_considered: usize, at: DateTime<Utc> },
+    SelfVectorUpdated { drift_hamming: u32, at: DateTime<Utc> },
+    ConsolidationRun { atoms_created: usize, contradictions: usize, at: DateTime<Utc> },
+}
+
+pub enum UnlearnTarget {
+    Episode(EpisodeId),
+    Belief(BeliefId),
+    Concept(ConceptId),
+    BySource(String),
+    BySession(SessionId),
+    Pattern(QueryPattern),
+}
+
+pub struct UnlearnReport {
+    pub episodes_removed: usize,
+    pub beliefs_removed: usize,
+    pub beliefs_revised: usize,
+    pub semantic_atoms_affected: usize,
+    pub procedures_affected: usize,
+    pub signatures_invalidated: usize,
+    pub self_vector_drift_hamming: u32,
+    pub audit_log_entry: LearningEventId,
+    pub tombstone_expiry: DateTime<Utc>,
+}
+
+pub struct AttentionTrace {
+    pub id: RecallId,
+    pub query: Query,
+    pub candidates: Vec<AttentionCandidate>,
+    pub goal_signature: Option<HV>,
+    pub recency_window: Duration,
+    pub timestamp: DateTime<Utc>,
+}
+
+pub struct AttentionCandidate {
+    pub episode_id: EpisodeId,
+    pub similarity: f32,
+    pub goal_bias: f32,
+    pub recency_boost: f32,
+    pub final_confidence: f32,
+    pub retained: bool,
+    pub rejection_reason: Option<String>,
+}
 ```
 
-### `recall()` in detail
+### v2.1 multimodal types
+
+```rust
+pub struct MultimodalSignatures {
+    pub video: Option<HV>,
+    pub audio: Option<HV>,
+    pub text: Option<HV>,
+}
+
+pub struct EncoderConfig {
+    pub role: EncoderRole,
+    pub version: String,
+    pub weight_sha: String,
+    pub projection_seed: u64,
+    pub d_input: usize,
+    pub d_output: usize,
+    pub huggingface_url: String,
+    pub registered_at: DateTime<Utc>,
+}
+
+pub enum EncoderRole {
+    VJepa2,
+    Wav2VecBert,
+    LlamaText,
+    Gliner,
+}
+
+pub struct BrainCalibration {
+    pub theta_brain: f32,
+    pub fitted_at: DateTime<Utc>,
+    pub calibration_dataset: String,    // e.g. "courtois-neuromod-subject-1"
+    pub tribe_version: String,           // e.g. "v2-march-2026"
+    pub tribe_weights_sha: String,
+    pub neural_threshold_sigma: f32,
+    pub pearson_correlation: f32,
+}
+
+pub struct BamsScore {
+    pub overall: f32,
+    pub per_network: HashMap<CorticalNetwork, f32>,
+    pub per_movie: HashMap<String, HashMap<CorticalNetwork, f32>>,
+    pub tribe_version: String,
+    pub agidb_version: String,
+    pub computed_at: DateTime<Utc>,
+}
+
+pub enum CorticalNetwork {
+    DefaultMode,
+    Visual,
+    Auditory,
+    Language,
+    DorsalAttention,
+    Frontoparietal,
+}
+
+pub struct VideoClip {
+    pub frames: Vec<Frame>,
+    pub fps: f32,
+    pub duration_ms: u32,
+}
+
+pub struct AudioClip {
+    pub samples: Vec<f32>,
+    pub sample_rate: u32,
+    pub duration_ms: u32,
+}
+
+pub struct MultimodalFrame {
+    pub video: Option<VideoClip>,
+    pub audio: Option<AudioClip>,
+    pub text: Option<String>,
+    pub received_at: DateTime<Utc>,
+}
+
+pub enum SelfVectorTrigger {
+    Consolidation,
+    Unlearn,
+    Manual,
+}
+
+pub struct SelfVectorSnapshot {
+    pub id: SelfVectorSnapshotId,
+    pub taken_at: DateTime<Utc>,
+    pub signature: HV,
+    pub drift_from_previous: u32,
+    pub trigger: SelfVectorTrigger,
+}
+```
+
+### Query and recall types
 
 ```rust
 pub struct Query {
-    pub cue:             String,
-    pub k:               usize,
-    pub as_of:           Option<DateTime<Utc>>,
-    pub min_confidence:  f32,
-    pub include_pending: bool,    // also return strict-mode-filtered triples
-    pub tier_floor:      Tier,    // don't fall through below this tier
-
-    // working-memory controls
-    pub session_id:      Option<String>,    // scope or boost a session
-    pub session_only:    bool,              // if true, restrict to session_id
-    pub session_boost:   f32,               // multiplier for in-session results
-    pub recency_tau:     Duration,          // half-life for recency factor
+    pub cue_text: Option<String>,
+    pub entity_name: Option<String>,
+    pub extracted_triples: Vec<Triple>,
+    pub session_id: Option<SessionId>,
+    pub valid_as_of: Option<DateTime<Utc>>,
+    pub transaction_as_of: Option<DateTime<Utc>>,
+    pub tier_floor: Tier,
+    pub k: usize,
+    pub min_confidence: f32,
+    pub trace_attention: bool,
+    pub goal_bias_weight: f32,
+    pub recency_window: Duration,
 }
 
 impl Query {
-    pub fn cue(text: &str) -> Self {
-        Query {
-            cue: text.into(), k: 10, as_of: None,
-            min_confidence: 0.0, include_pending: false,
-            tier_floor: Tier::NearestNeighbor,
-            session_id: None, session_only: false, session_boost: 1.0,
-            recency_tau: Duration::from_secs(3600),
-        }
-    }
+    pub fn cue(text: impl Into<String>) -> Self;
+    pub fn entity(name: impl Into<String>) -> Self;
+    pub fn with_session(self, id: SessionId) -> Self;
+    pub fn as_of(self, valid: DateTime<Utc>) -> Self;
+    pub fn transaction_at(self, tx: DateTime<Utc>) -> Self;
+    pub fn tier_floor(self, tier: Tier) -> Self;
+    pub fn k(self, k: usize) -> Self;
+    pub fn min_confidence(self, c: f32) -> Self;
+    pub fn trace_attention(self, trace: bool) -> Self;
+    pub fn with_goal_bias(self, weight: f32) -> Self;
+}
 
-    pub fn session_id(mut self, id: impl Into<String>) -> Self {
-        self.session_id = Some(id.into()); self
-    }
-
-    pub fn session_only(mut self, b: bool) -> Self {
-        self.session_only = b; self
-    }
-
-    pub fn session_boost(mut self, b: f32) -> Self {
-        self.session_boost = b; self
-    }
+pub enum Tier {
+    Exact,
+    Similarity,
+    Gist,
+    NearestNeighbor,
 }
 
 pub struct Recall {
-    pub matches:        Vec<RecallMatch>,     // episodic
-    pub semantic_atoms: Vec<SemanticMatch>,   // consolidated facts
-    pub tier_used:      Tier,
-    pub elapsed_ms:     u32,
+    pub matches: Vec<RecallMatch>,
+    pub semantic_atoms: Vec<SemanticMatch>,
+    pub beliefs: Vec<BeliefMatch>,
+    pub active_goals: Vec<GoalId>,
+    pub tier_used: Tier,
+    pub elapsed_ms: u32,
+    pub attention_trace: Option<AttentionTrace>,
 }
 
 pub struct RecallMatch {
     pub episode_id: EpisodeId,
-    pub text:       String,
-    pub triples:    Vec<Triple>,
+    pub text: String,
     pub confidence: f32,
-    pub valid_time: TimeRange,
+    pub tier: Tier,
+    pub low_confidence: bool,
+    pub goal_biased: bool,
     pub provenance: Provenance,
-    pub superseded: bool,
-    pub source_tier: Tier,
+    pub modalities: Vec<Modality>,  // v2.1
 }
 
 pub struct SemanticMatch {
-    pub atom_id:        SemanticAtomId,
-    pub statement:      String,           // canonical form
-    pub concept:        ConceptId,
-    pub evidence:       Vec<EpisodeId>,   // source episodes (provenance)
-    pub evidence_count: u32,
-    pub confidence:     f32,
-    pub last_referenced: DateTime<Utc>,
+    pub atom_id: AtomId,
+    pub atom: SemanticAtom,
+    pub confidence: f32,
 }
 
-pub enum Tier {
-    Exact,             // tier A: canonical entity match
-    Similarity,        // tier B: HDC signature similarity
-    Gist,              // tier C: raw-text gist fallback
-    NearestNeighbor,   // tier D: low-confidence nearest neighbors
+pub struct BeliefMatch {
+    pub belief_id: BeliefId,
+    pub belief: Belief,
+    pub confidence: f32,
 }
 ```
 
-example:
+## The main API
 
 ```rust
-let recall = db.recall(Query::cue("what did sarah say about thai food?")).await?;
+pub struct Agidb { /* private */ }
 
-for m in &recall.matches {
-    println!("[{:?} {:.2}] {}", m.source_tier, m.confidence, m.text);
+impl Agidb {
+    // Lifecycle
+    pub async fn open(path: impl AsRef<Path>) -> Result<Self>;
+    pub async fn create(path: impl AsRef<Path>, config: AgidbConfig) -> Result<Self>;
+    pub async fn close(self) -> Result<()>;
+
+    // Floor 1 — sensory
+    pub async fn observe_sensory(&self, frame: SensoryFrame) -> Result<SensoryId>;
+    pub async fn working_state(&self) -> Result<SensoryBuffer>;
+    pub async fn surprise_score(&self, frame: &SensoryFrame) -> Result<f32>;
+
+    // Floor 3 — episodic (v2.0 text)
+    pub async fn observe(&self, text: impl Into<String>, ctx: ObserveContext) -> Result<EpisodeId>;
+    pub async fn get_episode(&self, id: EpisodeId) -> Result<Option<Episode>>;
+    pub async fn supersede(&self, old: EpisodeId, new: EpisodeId) -> Result<()>;
+    pub async fn between(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> Result<Vec<Episode>>;
+
+    // Floor 1 + 3 — multimodal (v2.1)
+    pub async fn observe_multimodal(
+        &self,
+        video: Option<VideoClip>,
+        audio: Option<AudioClip>,
+        text: Option<String>,
+        ctx: ObserveContext,
+    ) -> Result<EpisodeId>;
+    pub async fn surprise_score_brain_calibrated(&self, frame: &MultimodalFrame) -> Result<f32>;
+    pub async fn extract_modality_signature(
+        &self,
+        episode_id: EpisodeId,
+        modality: Modality,
+    ) -> Result<Option<HV>>;
+
+    // Floor 1-7 — unified recall (goal-biased automatically)
+    pub async fn recall(&self, query: impl Into<Query>) -> Result<Recall>;
+
+    // Floor 4 — semantic
+    pub async fn consolidate(&self) -> Result<ConsolidationReport>;
+    pub async fn what_about(&self, concept: ConceptId) -> Result<Vec<SemanticMatch>>;
+
+    // Floor 5 — procedural
+    pub async fn observe_procedure(&self, p: Procedure) -> Result<ProcedureId>;
+    pub async fn record_execution(&self, p: ProcedureId, trace: ExecutionTrace) -> Result<()>;
+    pub async fn procedure_stats(&self, p: ProcedureId) -> Result<ProcedureStats>;
+    pub async fn recall_procedure(&self, query: Query) -> Result<Vec<Procedure>>;
+
+    // Floor 6 — goals
+    pub async fn set_goal(&self, goal: Goal) -> Result<GoalId>;
+    pub async fn revise_goal(&self, id: GoalId, patch: GoalPatch) -> Result<()>;
+    pub async fn complete_goal(&self, id: GoalId, evidence: Vec<EpisodeId>) -> Result<()>;
+    pub async fn abandon_goal(&self, id: GoalId, reason: String) -> Result<()>;
+    pub async fn active_goals(&self) -> Result<Vec<Goal>>;
+    pub async fn goal_tree(&self, root: GoalId) -> Result<GoalTree>;
+    pub async fn get_goal(&self, id: GoalId) -> Result<Option<Goal>>;
+
+    // Floor 6 — beliefs
+    pub async fn assert_belief(&self, belief: Belief) -> Result<BeliefId>;
+    pub async fn revise_belief(&self, id: BeliefId, new_evidence: EpisodeId) -> Result<RevisionReport>;
+    pub async fn what_do_i_believe(&self, about: ConceptId) -> Result<Vec<Belief>>;
+    pub async fn belief_history(&self, id: BeliefId) -> Result<Vec<BeliefRevision>>;
+    pub async fn withdraw_belief(&self, id: BeliefId, reason: String) -> Result<()>;
+
+    // Floor 7 — self-model
+    pub async fn what_did_i_learn(&self, since: DateTime<Utc>) -> Result<Vec<LearningEvent>>;
+    pub async fn attention_trace(&self, recall_id: RecallId) -> Result<Option<AttentionTrace>>;
+    pub async fn self_vector(&self) -> Result<HV>;
+    pub async fn self_vector_at(&self, time: DateTime<Utc>) -> Result<HV>;
+    pub async fn self_vector_history(&self, since: DateTime<Utc>) -> Result<Vec<SelfVectorSnapshot>>;
+    pub async fn introspect(&self, q: IntrospectionQuery) -> Result<IntrospectionResult>;
+
+    // Cross-floor — unlearn
+    pub async fn unlearn(&self, target: UnlearnTarget, reason: String) -> Result<UnlearnReport>;
+    pub async fn unlearn_report(&self, audit_id: AuditId) -> Result<UnlearnReport>;
+    pub async fn unlearn_history(&self, since: DateTime<Utc>) -> Result<Vec<UnlearnEvent>>;
+    pub async fn restore_within_window(&self, audit_id: AuditId) -> Result<RestoreReport>;
+
+    // Neurosymbolic
+    pub async fn neurosymbolic_query(&self, q: NeurosymbolicQuery) -> Result<Recall>;
+    pub async fn signature_to_triples(&self, sig: &HV) -> Result<Vec<Triple>>;
+    pub async fn triples_to_signature(&self, triples: &[Triple]) -> Result<HV>;
+
+    // v2.1 — brain alignment
+    pub async fn brain_calibration(&self) -> Result<BrainCalibration>;
+    pub async fn recalibrate(&self, dataset: CalibrationDataset) -> Result<BrainCalibration>;
+    pub async fn bams_self_score(&self) -> Result<BamsScore>;
+    pub async fn encoder_versions(&self) -> Result<HashMap<EncoderRole, EncoderConfig>>;
+
+    // Maintenance
+    pub async fn compact(&self) -> Result<CompactReport>;
+    pub async fn export_jsonl(&self, path: impl AsRef<Path>) -> Result<()>;
+    pub async fn import_jsonl(&self, path: impl AsRef<Path>) -> Result<ImportReport>;
+    pub async fn migrate_encoders(&self, new_config: EncoderConfig) -> Result<()>;  // v2.1
 }
-
-println!("used tier {:?} in {}ms", recall.tier_used, recall.elapsed_ms);
 ```
 
-### `what_about()` in detail
-
-returns a comprehensive view of a concept — all triples where it appears as subject or object, all aliases, all source episodes, with optional bi-temporal filter.
+## Encoder trait abstraction (v2.1)
 
 ```rust
-pub struct EntityView {
-    pub canonical_name: String,
-    pub aliases: Vec<String>,
-    pub entity_type: String,
-    pub triples_as_subject: Vec<Triple>,
-    pub triples_as_object: Vec<Triple>,
-    pub episode_count: u32,
-    pub first_seen: DateTime<Utc>,
-    pub last_seen: DateTime<Utc>,
-    pub semantic_atom: Option<SemanticAtom>,  // present if consolidated
+pub trait Encoder: Send + Sync {
+    type Input;
+    fn role(&self) -> EncoderRole;
+    fn config(&self) -> &EncoderConfig;
+    fn encode(&self, input: &Self::Input) -> Result<Vec<f32>>;
+}
+
+pub trait MultimodalEncoder: Encoder {
+    fn encode_and_project(&self, input: &Self::Input) -> Result<HV>;
+}
+
+pub struct VJepa2Encoder { /* private */ }
+pub struct Wav2VecBertEncoder { /* private */ }
+pub struct LlamaTextEncoder { /* private */ }
+
+impl Encoder for VJepa2Encoder {
+    type Input = VideoClip;
+    fn role(&self) -> EncoderRole { EncoderRole::VJepa2 }
+    fn config(&self) -> &EncoderConfig;
+    fn encode(&self, clip: &VideoClip) -> Result<Vec<f32>>;
+}
+
+impl MultimodalEncoder for VJepa2Encoder {
+    fn encode_and_project(&self, clip: &VideoClip) -> Result<HV>;
 }
 ```
 
-### `between()` in detail
+Two reference implementations per encoder: ONNX-backed (default) and Candle-backed (optional pure-Rust path).
 
-finds paths between two concepts via shared triples. uses HDC binding to compose path signatures, so multi-hop queries cost a single signature compute plus a hamming search — no actual graph traversal.
+## Error model
 
 ```rust
-pub struct Path {
-    pub nodes: Vec<ConceptId>,
-    pub edges: Vec<Triple>,
-    pub total_confidence: f32,
+#[derive(Debug, thiserror::Error)]
+pub enum AgidbError {
+    #[error("storage error: {0}")] Storage(#[from] redb::Error),
+    #[error("io error: {0}")] Io(#[from] std::io::Error),
+    #[error("extraction error: {0}")] Extraction(String),
+    #[error("encoder error: {0}")] Encoder(String),
+    #[error("encoder version mismatch: db={0}, binary={1}")]
+    EncoderVersionMismatch(String, String),
+    #[error("not found: {0}")] NotFound(String),
+    #[error("invalid input: {0}")] InvalidInput(String),
+    #[error("schema mismatch: db={0}, binary={1}")] SchemaMismatch(String, String),
+    #[error("LLM error: {0}")] Llm(String),
+    #[error("brain calibration error: {0}")] Calibration(String),
+    #[error("BAMS error: {0}")] Bams(String),
+    #[error("other: {0}")] Other(#[from] anyhow::Error),
 }
+
+pub type Result<T> = std::result::Result<T, AgidbError>;
 ```
 
-### `observe_procedure()` and `recall_procedure()` — procedural memory
+## Performance targets
 
-procedural memory in sochdb is a typed episode shape representing a workflow, skill, or routine the agent has learned. it answers the question *"how do i do X?"* the way episodic memory answers *"when did i do X?"* and semantic memory answers *"what is X?"*
+### v2.0 substrate
 
-```rust
-pub struct Procedure {
-    pub name:           String,           // canonical handle
-    pub description:    String,           // human-readable summary
-    pub trigger:        String,           // when to invoke (natural language)
-    pub preconditions:  Vec<String>,      // what must be true before
-    pub steps:          Vec<ProcedureStep>,
-    pub postconditions: Vec<String>,      // what should be true after
-    pub provenance:     Option<Provenance>,
-}
-
-pub struct ProcedureStep {
-    pub description: String,
-    pub tool:        Option<String>,      // tool to call, if applicable
-    pub args:        Option<Value>,
-}
-
-pub struct ProcedureMatch {
-    pub episode_id:    EpisodeId,
-    pub procedure:     Procedure,
-    pub confidence:    f32,
-    pub success_count: u32,
-    pub failure_count: u32,
-    pub last_invoked:  Option<DateTime<Utc>>,
-}
-```
-
-example:
-
-```rust
-db.observe_procedure(Procedure {
-    name: "deploy_to_staging".into(),
-    description: "deploy current branch to the staging environment".into(),
-    trigger: "when the user wants to deploy to staging".into(),
-    preconditions: vec![
-        "current branch passes tests".into(),
-        "user has staging credentials".into(),
-    ],
-    steps: vec![
-        ProcedureStep {
-            description: "verify tests pass".into(),
-            tool: Some("run_tests".into()),
-            args: None,
-        },
-        ProcedureStep {
-            description: "run the deploy script".into(),
-            tool: Some("shell".into()),
-            args: Some(json!({"cmd": "./deploy.sh staging"})),
-        },
-    ],
-    postconditions: vec!["staging URL is reachable".into()],
-    provenance: None,
-}).await?;
-```
-
-at recall time:
-
-```rust
-let procs = db.recall_procedure("how do i deploy to staging?", 3).await?;
-for p in procs {
-    println!("[{:.2}] {} ({} succ / {} fail)",
-             p.confidence, p.procedure.name,
-             p.success_count, p.failure_count);
-}
-```
-
-**what's deferred to v0.2:** specialized retrieval (matching procedures to current situations by precondition-checking), procedure composition, procedure execution (sochdb stores procedures but doesn't run them — that's the agent framework's job), and skill abstraction (learning new procedures from observed successful sequences).
-
-### `consolidate()` in detail
-
-```rust
-pub struct ConsolidationReport {
-    pub episodes_scanned: u32,
-    pub semantic_atoms_created: u32,
-    pub contradictions_detected: u32,
-    pub atoms_decayed: u32,
-    pub bytes_reclaimed: u64,
-    pub elapsed_ms: u32,
-}
-```
-
-normally consolidation runs as a background tokio task on the schedule configured at open time. calling `consolidate()` explicitly forces a synchronous run — useful for tests, debugging, or scripted maintenance.
-
-## error handling
-
-sochdb uses `anyhow::Result` for the public API and `thiserror`-typed errors internally:
-
-```rust
-#[derive(thiserror::Error, Debug)]
-pub enum SochError {
-    #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("database error: {0}")]
-    Database(#[from] redb::Error),
-
-    #[error("extraction failed: {0}")]
-    Extraction(String),
-
-    #[error("signature corruption at offset {0}")]
-    CorruptSignature(u64),
-
-    #[error("invalid query: {0}")]
-    InvalidQuery(String),
-
-    #[error("concept not found: {0}")]
-    UnknownConcept(String),
-
-    #[error("internal: {0}")]
-    Internal(String),
-}
-
-pub type Result<T> = std::result::Result<T, SochError>;
-```
-
-errors are always actionable. no swallowed errors. no panics in the public API.
-
-## the HDC kernel
-
-the heart of layer 1. minimal, no external dependencies.
-
-```rust
-// sochdb-core/src/hdc.rs
-
-pub const D: usize = 8192;
-pub const D_BYTES: usize = D / 8;   // 1024
-
-/// a binary hypervector. fixed size 8192 bits / 1024 bytes.
-#[derive(Clone, Copy)]
-#[repr(C, align(64))]
-pub struct HV(pub [u8; D_BYTES]);
-
-impl HV {
-    /// deterministic random HV from a hash of a name.
-    pub fn from_name(name: &str) -> Self { /* ... */ }
-
-    /// XOR-based binding. (self ⊗ other)
-    pub fn bind(&self, other: &HV) -> HV {
-        let mut out = [0u8; D_BYTES];
-        for i in 0..D_BYTES {
-            out[i] = self.0[i] ^ other.0[i];
-        }
-        HV(out)
-    }
-
-    /// majority-bundle of a set of HVs. (a ⊕ b ⊕ c ...)
-    pub fn bundle(hvs: &[HV]) -> HV { /* per-bit majority */ }
-
-    /// hamming distance via POPCOUNT. uses AVX-512 when available.
-    pub fn hamming(&self, other: &HV) -> u32 {
-        // unsafe { popcount_avx512(self.0.as_ptr(), other.0.as_ptr()) }
-        // with portable fallback
-        unimplemented!()
-    }
-
-    pub fn similarity(&self, other: &HV) -> f32 {
-        1.0 - (self.hamming(other) as f32 / D as f32)
-    }
-
-    /// active dimensions (indices where bit is set). used for indexing.
-    pub fn active_dims(&self) -> impl Iterator<Item = u32> + '_ {
-        self.0.iter().enumerate().flat_map(|(byte_idx, &b)| {
-            (0..8).filter(move |bit| (b >> bit) & 1 == 1)
-                  .map(move |bit| (byte_idx * 8 + bit) as u32)
-        })
-    }
-}
-```
-
-POPCOUNT uses `std::arch::x86_64::_mm512_popcnt_epi64` when `target_feature = "avx512vpopcntdq"`, with a portable fallback using `u64::count_ones()` over 128 chunks.
-
-## performance targets
-
-| metric | v0.1 target | mechanism |
+| Metric | Target | Inherited or new |
 |---|---|---|
-| `observe` p50 | ≤ 100ms | GLiNER bottleneck, ~150ms uncached → cached embedding via ONNX session reuse |
-| `observe` p95 | ≤ 200ms | as above + index update tail |
-| `recall` p50 | ≤ 20ms | inverted-index filter + POPCOUNT scan |
-| `recall` p95 | ≤ 50ms | as above + tier fall-through worst case |
-| `recall` p99 | ≤ 100ms | tier D nearest-neighbor scan |
-| `what_about` p95 | ≤ 30ms | indexed lookup |
-| `between` (3-hop) p95 | ≤ 80ms | HDC path binding + scan |
-| `consolidate` (10k episodes) | ≤ 5s | background, low priority |
-| open cold | ≤ 100ms | redb header + mmap init |
-| binary size | ≤ 60 MB | rust-stripped, no LLM weights |
-| memory footprint (idle) | ≤ 80 MB | mmap doesn't count toward RSS |
-| memory footprint (loaded 1M episodes) | ≤ 200 MB | working set; full file mmap'd |
+| `recall` p50 / p95 / p99 | ≤ 20ms / ≤ 50ms / ≤ 100ms | inherited |
+| `observe` (text) p50 / p95 | ≤ 100ms / ≤ 200ms | inherited (GLiNER-bound) |
+| 8192-bit hamming scan over 100k signatures | ≤ 5ms portable / ≤ 1.5ms AVX-512 | inherited |
+| `consolidate` (10k episodes) | ≤ 5s | inherited |
+| `set_goal` / `revise_goal` / `assert_belief` | ≤ 5ms | new |
+| `unlearn` cascade (1000-episode concept) | ≤ 100ms | new |
+| `what_did_i_learn` (last 7 days) | ≤ 50ms | new |
+| `self_vector` snapshot | ≤ 5ms | new |
+| Binary size | ≤ 80 MB | inherited |
+| Memory footprint (1M episodes loaded) | ≤ 250 MB | inherited |
 
-these are measured on a benchmark laptop: Apple M2 (or Intel i7-12700H), 16 GB RAM, NVMe SSD. AVX-512 path used when available; on M-series Macs we use NEON POPCOUNT.
+### v2.1 brain-aligned additions
 
-### benchmark reporting contract
+| Metric | Target (CPU) | Target (GPU) | Notes |
+|---|---|---|---|
+| `observe_multimodal` (30s video+audio clip) p50 | ≤ 2s | ≤ 500ms | V-JEPA dominates |
+| V-JEPA 2 inference (64 frames, 256×256) p50 | ≤ 1.5s | ≤ 200ms | M2 ANE / RTX 4090 |
+| Wav2Vec-BERT inference (60s audio) p50 | ≤ 400ms | ≤ 80ms | |
+| Llama-3.2-3B encoder (1024 tokens) p50 | ≤ 200ms | ≤ 30ms | |
+| Charikar 2002 projection (1024d → 8192-bit) | ≤ 1ms | n/a | SIMD-friendly |
+| Multimodal binding (3 modalities → 1 HV) | ≤ 200µs | n/a | |
+| Brain-calibrated surprise score | ≤ 500µs | n/a | |
+| `extract_modality_signature` | ≤ 1ms | n/a | XOR + nearest-neighbor cleanup |
+| BAMS single-movie evaluation | ≤ 30s | ≤ 5s | per-system per-movie |
+| BAMS full suite (6 movies × 7 systems × 6 networks) | ≤ 8h | ≤ 1h | parallelizable |
+| Binary size (with encoders bundled) | ≤ 4 GB | | |
+| Binary size (weights on-demand download) | ≤ 100 MB | | preferred default |
 
-sochdb publishes **all six metrics** on every public benchmark — never a single number. this is non-negotiable per [constitution](./constitution.md) article 10.
+## Configuration
 
-| metric | what it measures | why we publish it |
-|---|---|---|
-| **BLEU** | surface-form n-gram overlap with reference answer | conservative lower bound on correctness |
-| **F1** | token overlap with reference answer | industry standard, comparable to Mem0/Zep/Letta numbers |
-| **LLM-judge (binary)** | semantic correctness, judged by a held-out LLM | catches paraphrased correct answers F1 misses |
-| **token cost** | total prompt + completion tokens spent per query | dollars-per-recall comparability against Mem0's ~7k baseline |
-| **p95 latency** | end-to-end recall latency including any network calls | the user-facing number |
-| **noisy-cue degradation** | accuracy when 20% of cue tokens are corrupted | tests graceful tier-C/D fallback (sochdb's bet) |
-
-every published metric ships with: the harness commit hash, baseline system versions (pinned in `bench/lockfile.toml`), the judge model used for LLM-judge, and the raw per-query logs. judge models are held out — sochdb does not tune against any model used as a judge.
-
-three benchmark suites are run on every release:
-
-| benchmark | what it tests | source |
-|---|---|---|
-| **LongMemEval-S** | long-context memory accuracy on episodic recall | Wu et al., 2024 |
-| **LoCoMo** | long conversation memory across 10+ sessions | Maharana et al., 2024 |
-| **BEAM** | scale to millions of tokens; contradiction resolution; instruction following | Mem0, 2026 |
-
-## dependencies
-
-minimal, deliberate, all rust:
-
-| crate | purpose | why this one |
-|---|---|---|
-| `tokio` | async runtime | de facto rust async standard |
-| `redb` | embedded ACID KV | pure rust, ACID, MVCC |
-| `memmap2` | mmap | safe rust mmap |
-| `croaring` | roaring bitmaps | rust bindings, mature |
-| `ort` | ONNX runtime | for GLiNER |
-| `tokenizers` | HF tokenizers | for GLiNER input |
-| `chrono` | dates and times | bi-temporal stamps |
-| `serde` + `bincode` | serialization | for redb values |
-| `anyhow` + `thiserror` | error handling | rust convention |
-| `tracing` | structured logging | rust convention |
-| `clap` | CLI parsing | for `sochdb` binary |
-| `pyo3` | python bindings | for `sochdb-py` |
-
-we explicitly avoid:
-- LLM SDKs (openai, anthropic) in `sochdb-core` — only in `sochdb-extract` behind a feature flag
-- C/C++ dependencies where a rust equivalent exists
-- async-std and other tokio competitors
-
-## the CLI
-
-```bash
-sochdb open ./memory.soch
-sochdb observe ./memory.soch "Sarah recommended Bawri"
-sochdb recall ./memory.soch "what thai place"
-sochdb what-about ./memory.soch "Sarah"
-sochdb consolidate ./memory.soch
-sochdb stats ./memory.soch
-sochdb export ./memory.soch --format jsonl > backup.jsonl
-sochdb import ./memory.soch < backup.jsonl
-```
-
-the CLI is for debugging and ops. typical users embed sochdb in their app.
-
-## the MCP server
-
-`sochdb-mcp` exposes the API as MCP tools so any MCP-compatible agent (Claude Desktop, Cursor, Claude Code, OpenAI MCP clients) can use sochdb as a memory layer:
-
-```jsonc
-// tools exposed
-{
-  "name": "memory_observe",
-  "description": "Store a new memory in sochdb.",
-  "input_schema": {
-    "type": "object",
-    "properties": {
-      "text": { "type": "string" },
-      "valid_time": { "type": "string", "format": "date-time" }
-    },
-    "required": ["text"]
-  }
+```rust
+pub struct AgidbConfig {
+    pub max_episode_signatures: usize,            // default 10_000_000
+    pub consolidation_interval: Duration,         // default 5min
+    pub consolidation_min_evidence: u32,          // default 3
+    pub belief_promotion_threshold: u32,          // default 5
+    pub similarity_threshold_tier_b: f32,         // default 0.6
+    pub similarity_threshold_tier_c: f32,         // default 0.3
+    pub similarity_threshold_tier_d: f32,         // default 0.0
+    pub default_goal_bias_weight: f32,            // default 0.3
+    pub sensory_buffer_capacity: usize,           // default 1000
+    pub sensory_buffer_duration: Duration,        // default 60s
+    pub surprise_threshold: f32,                  // default 0.4 (v2.0) or brain-calibrated (v2.1)
+    pub tombstone_retention: Duration,            // default 30 days
+    pub self_vector_alpha: f32,                   // default 0.05
+    pub enable_signed_audit: bool,                // default false; v0.3+
+    pub backend: EncoderBackend,                  // default Onnx; v2.1
+    pub gpu_acceleration: GpuConfig,              // v2.1
+    pub brain_calibration: Option<BrainCalibration>, // v2.1; None until calibrated
 }
 
-{
-  "name": "memory_recall",
-  "description": "Recall memories matching a partial cue.",
-  "input_schema": {
-    "type": "object",
-    "properties": {
-      "cue": { "type": "string" },
-      "k": { "type": "integer", "default": 10 },
-      "as_of": { "type": "string", "format": "date-time" }
-    },
-    "required": ["cue"]
-  }
+pub enum EncoderBackend {
+    Onnx,
+    Candle,
 }
 
-{ "name": "memory_what_about", "..." }
-{ "name": "memory_between", "..." }
-{ "name": "memory_consolidate", "..." }
-```
-
-running:
-
-```bash
-sochdb-mcp --db ./memory.soch --transport stdio
-```
-
-claude desktop's mcp config:
-
-```json
-{
-  "mcpServers": {
-    "sochdb": {
-      "command": "sochdb-mcp",
-      "args": ["--db", "/Users/rohan/memory.soch"]
-    }
-  }
+pub struct GpuConfig {
+    pub use_metal: bool,   // Apple
+    pub use_cuda: bool,    // NVIDIA
+    pub fallback_to_cpu: bool,
 }
 ```
 
-this is the primary distribution path. an agent gets memory by installing a binary, not by writing glue code.
+## BAMS API (agidb-bams crate, v2.1)
 
-## python bindings
+```rust
+pub struct BamsBenchmark { /* private */ }
 
-`sochdb-py` via pyo3:
+impl BamsBenchmark {
+    pub async fn new(config: BamsConfig) -> Result<Self>;
+    pub async fn run_full_suite(&self) -> Result<BamsReport>;
+    pub async fn run_single_movie(&self, movie: &str, system: &dyn AgentMemorySystem) -> Result<BamsScore>;
+    pub async fn compute_baselines(&self) -> Result<HashMap<String, BamsScore>>;
+}
+
+pub trait AgentMemorySystem: Send + Sync {
+    fn name(&self) -> &str;
+    async fn replay_stimulus(&mut self, stream: &StimulusStream) -> Result<Vec<HV>>;
+}
+
+pub struct BamsConfig {
+    pub movies: Vec<String>,
+    pub networks: Vec<CorticalNetwork>,
+    pub tribe_weights_path: PathBuf,
+    pub stimulus_dataset_root: PathBuf,
+    pub output_path: PathBuf,
+}
+
+pub struct BamsReport {
+    pub version: String,
+    pub timestamp: DateTime<Utc>,
+    pub systems: HashMap<String, BamsScore>,
+    pub reproduction: ReproductionInfo,
+}
+```
+
+## Python bindings (agidb-py)
+
+`pip install agidb`. All async methods exposed as async Python via pyo3-asyncio.
 
 ```python
-import sochdb
 import asyncio
+import agidb
 
 async def main():
-    db = await sochdb.open("./memory.soch")
+    db = await agidb.Agidb.open("./memory.agidb")
 
-    await db.observe("Sarah recommended Bawri in Bandra last weekend")
+    # v2.0 — text observe
+    await db.observe("Sarah recommended Bawri", ctx=agidb.ObserveContext())
 
-    recall = await db.recall("what thai place")
-    for m in recall.matches:
+    # v2.1 — multimodal observe
+    await db.observe_multimodal(
+        video=agidb.VideoClip.from_file("dinner.mp4"),
+        audio=agidb.AudioClip.from_file("dinner.wav"),
+        text="sarah recommended Bawri",
+    )
+
+    # Goals + beliefs
+    goal = await db.set_goal(agidb.Goal(description="find a thai place"))
+    await db.assert_belief(agidb.Belief(
+        claim="Sarah likes thai food", confidence=0.8
+    ))
+
+    # Recall
+    result = await db.recall(agidb.Query.cue("what thai place did sarah mention?"))
+    for m in result.matches:
         print(f"[{m.confidence:.2f}] {m.text}")
+
+    # v2.1 — BAMS self-score
+    bams = await db.bams_self_score()
+    print(f"BAMS overall: {bams.overall:.3f}")
 
 asyncio.run(main())
 ```
 
-the python wrapper is thin — types map directly, async is preserved, errors translate to python exceptions. `pip install sochdb` ships pre-built wheels for linux/macOS/windows on x86_64 and aarch64.
+## MCP server (agidb-mcp)
 
-## versioning and compatibility
+Exposes the public API as MCP tools. Connect from Claude Desktop:
 
-semver:
-- `0.x.y`: breaking changes allowed between minor versions; sochdb is pre-1.0
-- `1.0.0`: API stability commitment; on-disk format stability
+```json
+{
+  "mcpServers": {
+    "agidb": {
+      "command": "agidb-mcp",
+      "args": ["--db", "/path/to/memory.agidb"]
+    }
+  }
+}
+```
 
-on-disk format versioning: `manifest.toml` includes `format_version`. each release supports reading the previous N format versions and ships a migration path. data is never silently rewritten — migration is explicit (`sochdb migrate <path>`).
+Tools exposed: `observe`, `observe_multimodal` (v2.1), `recall`, `set_goal`, `revise_goal`, `assert_belief`, `revise_belief`, `unlearn`, `consolidate`, `what_did_i_learn`, `what_do_i_believe`, `active_goals`, `between`, `bams_self_score` (v2.1).
 
-## testing strategy
+## Stability commitments
 
-three layers of testing:
+| API surface | Stability |
+|---|---|
+| HDC kernel (HV, bind, bundle, hamming) | stable since sochdb v1; no breaks expected |
+| Storage layout | format_version pinned in manifest; migrations explicit |
+| Encoder versions | pinned in manifest; mismatch errors |
+| Public Agidb API | stabilizing, semver from 1.0 (post-v2.0 launch) |
+| Internal traits / type bounds | may evolve; pre-1.0 |
+| BAMS protocol | v2.1 is "BAMS v1"; future BAMS v2 may differ |
+| Brain calibration | v2.1 against TRIBE v2 march 2026; recalibration required for TRIBE v3 |
 
-1. **unit tests** in each crate. `cargo test`. covers HDC kernel correctness, redb schema migrations, GLiNER wrapper, MCP server tool definitions.
-2. **property-based tests** via `proptest`. covers HDC algebra (binding inverse, bundling membership), confidence monotonicity, supersession invariants.
-3. **benchmark harness** in `sochdb-bench`. runs **LongMemEval-S, LoCoMo, and BEAM** against sochdb, Mem0, Zep/Graphiti, and Letta. publishes the full six-metric stack (BLEU + F1 + LLM-judge + token cost + p95 latency + noisy-cue degradation) with raw logs per the benchmark reporting contract above.
+## What this spec doesn't cover
 
-CI runs unit + property tests on every PR. the benchmark harness is gated to nightly to keep PR CI fast; full releases must re-run the harness with pinned baseline versions and publish the raw logs alongside the release notes.
+- Detailed consolidation algorithm (see architecture.md)
+- Detailed BAMS protocol (see bams-benchmark.md)
+- Detailed brain-alignment derivation (see brain-alignment.md)
+- Per-floor cognitive semantics (see cognitive-primitives.md)
+- HDC math justification (see layer-1-recall.md)
+- Encoder selection rationale (see layer-2-extraction.md)
+- Storage schema rationale (see layer-3-storage.md)
+- 5-year evolution plan (see agi-trajectory.md)
 
-## what's *not* in v0.1
-
-explicit non-goals:
-
-- distributed mode
-- multi-tenancy
-- a hosted cloud tier (the API is designed to support one later)
-- a query language
-- a UI
-- multimodal storage
-- transactions across multiple `observe()` calls
-- compression of signatures
-- encryption at rest
-- replication / WAL streaming
-
-see [ROADMAP.md](../product/roadmap.md) for what's deferred to v0.2, v0.3, v1.0.
-
-## next reads
-
-- [ARCHITECTURE.md](../architecture/architecture.md) — system-level architecture
-- [LAYER_1_RECALL.md](../architecture/layer-1-recall.md) — HDC math
-- [ROADMAP.md](../product/roadmap.md) — milestones and timeline
+This document is the API surface reference. The other docs are the why.

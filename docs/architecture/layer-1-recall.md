@@ -1,314 +1,437 @@
-# layer 1 — recall (the mind-like layer)
+# agidb — Layer 1: Recall
 
-this is the layer that makes sochdb feel like a mind instead of a database. it implements the brain-inspired primitive at the core of the system: content-addressable retrieval through hyperdimensional computing.
+> The mind-like layer. HDC signatures, binding, bundling, hamming-distance
+> retrieval, tiered confidence, goal-biased weighting, attention tracing.
+> The substrate's most-touched code path; the one the user experiences.
 
-if you only read one layer doc, read this one — it's the differentiator.
+## What layer 1 is
 
-## the core idea
+Layer 1 is where memories become hypervectors and retrieval becomes bit-overlap counting. It's the layer that makes agidb feel different from a vector database. Where other systems do "embed → similarity search → rerank → answer," layer 1 does "bind into HDC → POPCOUNT scan → tiered confidence → answer."
 
-every memory stored in sochdb becomes a single **8192-bit binary vector** called a *signature*. retrieval works by finding stored signatures that overlap (in bits) with a partial signature computed from the query.
+Layer 1 sits on top of layer 3 (storage) and uses output from layer 2 (extraction). Its public-facing surface is `recall()`, the read-path function the agent calls most often.
 
-there is no query language. there is no separate index. the signature *is* the index. retrieval is bit-counting.
+## The HDC kernel
 
-## why hyperdimensional computing
+### Hypervectors
 
-hyperdimensional computing (HDC), also called vector symbolic architectures (VSA), is a 30-year-old line of research started by Tony Plate (HRR, 1995), Pentti Kanerva (Sparse Distributed Memory, 1988; Hyperdimensional Computing, 2009), and Ross Gayler (VSA, 2003). it has three properties that conventional ML doesn't:
-
-1. **content-addressable.** given a partial pattern, the system retrieves the nearest complete pattern. this is exactly what human memory does and what databases don't.
-
-2. **algebraically composable.** you can bind two vectors into a "role-filler" pair, bundle vectors into sets, and unbind to recover components — all with deterministic math, no learning. compositions are still hypervectors and can be retrieved like any other.
-
-3. **graceful degradation.** noisy or partial queries still return reasonable results. the system doesn't have a binary hit/miss threshold; it has a continuous confidence gradient.
-
-modern relevance: Bricken & Pehlevan (NeurIPS 2021) proved that transformer attention is mathematically equivalent to Kanerva's sparse distributed memory. PathHD (arXiv 2512.09369, December 2025, UC Irvine Imani group) demonstrated encoder-free knowledge graph retrieval with HDC matching neural baselines at 40-60% lower latency. HPE's Hippocampus paper (arXiv 2602.13594, Feb 2026) showed binary-signature retrieval beating vector databases on agent-memory benchmarks.
-
-the math is solid, the references are real, and the productization gap is wide open. sochdb is the bet that this is the right primitive for agent memory in rust, embedded.
-
-## the building blocks
-
-### concept vectors (atoms)
-
-every entity, relation, and time anchor that sochdb knows about has a fixed 8192-bit hypervector called an *atom*. atoms are generated once and never change.
-
-```
-Sarah_hv        : 8192-bit vector, ~50% bits set, random
-Bawri_hv        : 8192-bit vector, ~50% bits set, random
-recommended_hv  : 8192-bit vector, ~50% bits set, random
-SUBJ_hv         : 8192-bit vector, ~50% bits set, random
-PRED_hv         : 8192-bit vector, ~50% bits set, random
-OBJ_hv          : 8192-bit vector, ~50% bits set, random
-TIME_hv         : 8192-bit vector, ~50% bits set, random
-2026-05-09_hv   : 8192-bit vector, derived from date encoding
-```
-
-atoms are pseudo-random — generated deterministically from a hash of the canonical name, so the same entity always gets the same atom across runs. two unrelated atoms are nearly orthogonal (hamming distance ~4096 out of 8192).
-
-### binding (⊗)
-
-binding combines two hypervectors into one, producing a *role-filler* pair. binding is implemented as XOR for binary spatter codes (BSC):
-
-```
-A ⊗ B  =  A XOR B
-```
-
-properties:
-- the result is approximately orthogonal to both A and B
-- binding is its own inverse: `(A ⊗ B) ⊗ B = A`
-- binding is commutative for XOR — order doesn't matter (use permutation for order-aware binding)
-
-we use binding to attach roles to fillers:
-
-```
-SUBJ ⊗ Sarah       = "Sarah in the subject role"
-PRED ⊗ recommended = "recommended in the predicate role"
-OBJ  ⊗ Bawri       = "Bawri in the object role"
-```
-
-### bundling (⊕)
-
-bundling combines multiple hypervectors into one *set-like* superposition. bundling is implemented as majority vote for binary vectors:
-
-```
-A ⊕ B ⊕ C  =  per-bit majority of A, B, C
-```
-
-properties:
-- the result is similar (in hamming distance) to each input
-- the result is *not* equal to any input — it's a superposition
-- you can ask "is X in the bundle?" by computing hamming(bundle, X) — if it's much less than 4096, yes
-
-we use bundling to combine triples into an episode:
-
-```
-episode = (SUBJ⊗Sarah ⊕ PRED⊗recommended ⊕ OBJ⊗Bawri)
-        ⊕ (SUBJ⊗Bawri ⊕ PRED⊗located_in ⊕ OBJ⊗Bandra)
-        ⊕ (TIME ⊗ 2026-05-09)
-```
-
-### unbinding for retrieval
-
-if you have the bundled episode and you know the role you want to query, you can *unbind* to get back a noisy estimate of the filler:
-
-```
-episode ⊗ SUBJ  ≈  Sarah  (noisy)
-```
-
-the result isn't exactly Sarah's atom — it's contaminated by the other parts of the bundle. but it's close enough to Sarah's atom that a cleanup step (modern Hopfield or hamming nearest-neighbor over known atoms) recovers the clean Sarah_hv.
-
-this is how you do "what did sarah say?" — bind a probe pattern, hamming-search against stored signatures, return matches.
-
-## the recall pipeline in detail
-
-### tier A — exact match
-
-if the query mentions a known canonical entity ("Sarah", "Bawri"), we first check the concept index in redb:
-
-```
-concept_index[Sarah] → [episode_id_1, episode_id_42, ...]
-```
-
-if there are exact matches with high enough confidence, return them immediately. this is the fast path — microseconds. handles "tell me about Sarah" trivially.
-
-confidence: 1.0 if canonical match, drops if multiple entities share the name (disambiguation needed).
-
-### tier B — similarity match (the main path)
-
-if tier A misses or confidence is low, we compute a partial signature from the query and run a hamming-distance scan.
-
-steps:
-
-1. **compute query signature.** GLiNER extracts the partial triple shape from the query. unknown slots (the thing being asked about) are left blank. bind known slots:
-
-```
-query_sig = (SUBJ⊗Sarah ⊕ PRED⊗mentioned ⊕ OBJ⊗?)
-          ⊕ (TYPE ⊗ thai_restaurant)
-```
-
-2. **first-pass filter via inverted index.** the inverted index in redb maps each active dimension to the list of episode_ids whose signatures have that bit set. we intersect the posting lists for the top-K most active dims in the query signature, giving us a candidate set of (typically) a few hundred episodes — not the full 100k+ database.
-
-3. **POPCOUNT hamming distance.** for each candidate, XOR the query signature against the stored signature and count the set bits. AVX-512 POPCOUNT processes 512 bits per instruction; a full 8192-bit comparison is 16 instructions and runs in nanoseconds.
-
-```
-hamming(a, b) = popcount(a XOR b)
-similarity    = 1 - (hamming / 8192)
-```
-
-4. **rank and threshold.** top-K candidates by similarity. confidence is derived from the hamming distance: a perfect match is similarity 1.0; orthogonal vectors are around 0.5. anything above ~0.7 is a meaningful match.
-
-5. **return.** typically 5-50ms p95 on a laptop for 100k stored episodes.
-
-### tier C — gist match (fallback)
-
-if tier B returns no high-confidence matches, sochdb falls back to a *gist signature* — a separate signature computed from the raw text of the observation (via sparse hashing of tokens) rather than from the structured triples. gist signatures are less precise but capture meaning even when entity extraction missed something.
-
-confidence at this tier is capped at 0.7 — sochdb is explicitly telling the user "i found something kind of relevant but the structured match failed."
-
-### tier D — nearest neighbors (last resort)
-
-if every tier fails to find a confident match, sochdb returns the K nearest signatures by hamming distance, all marked with `low_confidence: true`. **sochdb never returns an empty result set.** the agent always has something to work with, and always knows how much to trust it.
-
-this is the "graceful degradation" property that distinguishes content-addressable memory from query-based memory. a SQL query that misses returns zero rows. a vector search below threshold returns empty. sochdb returns the nearest available memory with explicit confidence — the agent can decide what to do with it.
-
-## why this works — the math intuition
-
-three intuitions worth carrying:
-
-**1. high dimensions are sparse.** in 8192 dimensions, two random vectors are almost certainly orthogonal. this means atoms don't interfere with each other much — binding `SUBJ ⊗ Sarah` doesn't accidentally look like `OBJ ⊗ Bawri` because the role atoms and filler atoms are independent random patterns.
-
-**2. bundles preserve approximate membership.** when you bundle 10 hypervectors, each one is still recognizable in the result — the hamming distance from any member to the bundle is around 30% (not 0%, not 50%), well below the orthogonal baseline. this is what makes retrieval-by-overlap work even after lots of bundling.
-
-**3. binding is a clean inverse.** because XOR is its own inverse, unbinding a role from a bundle gives back a noisy copy of the filler. the noise is bounded and predictable, and a cleanup step recovers the clean atom from a small known dictionary.
-
-these three properties together give you the brain-like behavior: store many composite memories in one bundle, retrieve by partial cue, get a noisy result, clean it up. all with simple bitwise operations.
-
-## performance characteristics
-
-| operation | target | mechanism |
-|---|---|---|
-| signature compute (write) | < 1ms | XOR + majority over ~10 triples |
-| inverted-index lookup | < 1ms | roaring bitmap intersection |
-| POPCOUNT scan over 100k candidates | < 5ms | AVX-512, 16 instructions per pair |
-| recall end-to-end (tier B) | p50 < 20ms, p95 < 50ms | dominated by GLiNER on query |
-| signature size on disk | 1 KB | 8192 bits |
-| 1M episodes on disk | ~1 GB | linear in episode count |
-| 1M episode hamming scan | < 50ms | with inverted-index pre-filter |
-
-these are achievable on a single laptop CPU. no GPU. no network.
-
-## what about scale beyond 1M episodes?
-
-for very large memory stores (10M+ episodes), the linear hamming scan starts to dominate. mitigations, in order of increasing complexity:
-
-1. **inverted-index pre-filter** (already in v0.1). cuts candidate set to a few hundred regardless of total store size.
-2. **locality-sensitive hashing (LSH).** index signatures by hashed projections of their active dims. enables sub-linear nearest-neighbor.
-3. **HNSW over binary vectors.** the `hnsw_rs` crate works on hamming distance. log-scale recall above 10M.
-4. **Dynamic Wavelet Matrix (DWM).** the structure described in the HPE Hippocampus paper. enables compressed search over very large stores. deferred to v1.0+.
-
-v0.1 targets 1M episodes with the inverted-index path. anything beyond is a v0.2 problem.
-
-## comparison to alternatives
-
-| approach | retrieval mechanism | latency at 100k | model dependency |
-|---|---|---|---|
-| sochdb (HDC) | POPCOUNT hamming + bitmap intersect | 20-50ms | none (encoder-free) |
-| dense vector DB (Pinecone, Qdrant) | cosine similarity over learned embeddings | 50-200ms | embedding model required |
-| knowledge graph (Zep, Graphiti) | Cypher traversal + reranking | 200ms-1s | LLM for extraction + traversal |
-| LLM-judged retrieval (LangMem) | LLM scores candidates | 5-60s | LLM in hot path |
-| Mem0 (hybrid) | multi-signal: vector + graph + KV | 100-500ms | LLM for extraction, optional rerank |
-
-sochdb's tradeoff: no learned semantic generalization (a learned embedding will match "physician" to "doctor"; sochdb won't unless the extractor links them). mitigation: tier C gist + a small learned concept-similarity layer in v0.2.
-
-## the episodic-semantic split in retrieval
-
-sochdb stores both **episodic memories** (specific events with time and provenance) and **semantic atoms** (consolidated facts decoupled from specific events). these are biologically distinct in the brain — episodic memory lives in the hippocampus initially, semantic memory consolidates to the neocortex — and they answer different questions in agent retrieval.
-
-an agent asks: *"what does sarah like to eat?"*
-
-- **episodic answer:** "on April 12, sarah said she liked the thai place." "on April 28, sarah ordered thai again." "on May 9, sarah recommended Bawri."
-- **semantic answer:** "sarah likes thai food. (evidence: 7 episodes, confidence 0.91)"
-
-both are correct. they answer different questions. the agent might want one, the other, or both.
-
-### how sochdb returns both
-
-`recall()` returns a `Recall` struct with two parallel result lists:
+8192-bit binary hypervectors. 1024 bytes each. 64-byte aligned for SIMD.
 
 ```rust
-pub struct Recall {
-    pub matches:         Vec<RecallMatch>,    // episodic matches
-    pub semantic_atoms:  Vec<SemanticMatch>,  // consolidated facts
-    pub tier_used:       Tier,
-    pub elapsed_ms:      u32,
+#[repr(align(64))]
+pub struct HV {
+    pub bits: [u64; 128],   // 128 × 64 = 8192 bits
 }
 ```
 
-both lists are populated in one query. the agent decides which to use, or uses both. typical patterns:
+### The three core operations
 
-- *"give me the latest on X"* → use `matches`, sorted by `valid_time` descending
-- *"what's generally true about X"* → use `semantic_atoms`, sorted by confidence
-- *"answer this question"* → use both; prefer semantic if evidence count is high, fall back to episodic
+**1. Bind (`⊗` or `XOR`):**
+```rust
+pub fn bind(&self, other: &HV) -> HV {
+    HV { bits: array::from_fn(|i| self.bits[i] ^ other.bits[i]) }
+}
+```
+Bind two HVs into a third HV that is **dissimilar to both**. Used for role-filler patterns: `bind(ROLE_SUBJ, Sarah_HV)` is "the subject is Sarah," similar to neither ROLE_SUBJ alone nor Sarah_HV alone. Self-inverse: `bind(bind(a, b), b) = a`.
 
-### when an episode becomes a semantic atom
+**2. Bundle (majority vote):**
+```rust
+pub fn bundle(hvs: &[HV]) -> HV {
+    let mut counts = [0i32; 8192];
+    for hv in hvs {
+        for bit_idx in 0..8192 {
+            if hv.get_bit(bit_idx) { counts[bit_idx] += 1; } else { counts[bit_idx] -= 1; }
+        }
+    }
+    let mut result = HV::zero();
+    for bit_idx in 0..8192 {
+        if counts[bit_idx] > 0 { result.set_bit(bit_idx); }
+    }
+    result
+}
+```
+Bundle multiple HVs into one HV that is **similar to all of them**. Per-bit majority vote, thresholded to binary. Used to compose multiple bindings (multiple role-filler pairs in an episode signature).
 
-the consolidation worker (described in ARCHITECTURE.md) is what bridges the two. it scans recent episodes, finds clusters of similar bound patterns, and produces a `SemanticAtom` when:
+**3. Hamming (POPCOUNT distance):**
+```rust
+pub fn hamming(&self, other: &HV) -> u32 {
+    self.bits.iter().zip(&other.bits)
+        .map(|(a, b)| (a ^ b).count_ones())
+        .sum()
+}
+pub fn similarity(&self, other: &HV) -> f32 {
+    1.0 - (self.hamming(other) as f32) / 8192.0
+}
+```
+Hamming distance is bit-overlap counting. Similarity is `1 - hamming/8192` ∈ [0, 1]. POPCOUNT is a single CPU instruction on modern hardware; AVX-512 has VPOPCNTQ; ARM NEON has CNT. Portable Rust path uses `u64::count_ones()`.
 
-- evidence count ≥ 3 (configurable)
-- cluster cohesion (mean pairwise hamming distance) below threshold
-- no contradictions within the cluster
+### Why binary, not real-valued
 
-once a semantic atom exists, future recalls on the same concept return it alongside any new episodic evidence. the semantic atom is updated (`evidence_count++`) but not replaced — provenance to source episodes is preserved.
+| | binary BSC (agidb) | real-valued HRR |
+|---|---|---|
+| bind operation | XOR (1 instruction) | circular convolution (FFT) |
+| similarity | hamming (POPCOUNT) | cosine (multiply-add) |
+| storage | 1 KB per HV | 32 KB per HV (8192 × float32) |
+| ops/second | ~10× faster | slower |
+| theoretical capacity | excellent for compositional structure | excellent for analog scalars |
+| factorability | clean (XOR self-inverse) | requires resonator networks |
 
-### why two lists, not one ranked list
+For agidb's use case (compositional structure over discrete concepts), BSC wins on every metric except analog scalars. v2.3 adds HRR as a secondary format for analog values (temperatures, scores, probabilities); v2.1 stays pure BSC.
 
-we could merge episodes and semantic atoms into a single ranked result. mem0 mostly does this. we don't, for three reasons:
+### Why 8192 bits
 
-1. **type is information.** the agent often needs to know "this is a remembered specific event" vs "this is consolidated general knowledge." different downstream behavior.
-2. **provenance is different.** an episode points to one observation. a semantic atom points to many. surfacing them separately makes the evidence trail clear.
-3. **confidence is computed differently.** episodic confidence comes from extraction and HDC similarity; semantic confidence comes from evidence count and cluster cohesion. mixing them in a single score hides the difference.
+- **Capacity:** at 8192 bits with random hypervectors, the probability of two unrelated HVs having hamming distance > 4000 is essentially 1.0. So similarity > 0.51 is meaningful signal.
+- **Cache friendliness:** 1024 bytes = 16 × 64-byte cache lines. POPCOUNT scan over 100k signatures is ~5ms on Zen 4 portable path, ~1.5ms with AVX-512.
+- **Charikar 2002 JL bound:** for embedding distances of typical ML latents (1024-2048 dims), 8192 bits provides ε ≈ 0.05 distortion.
+- **Round number:** debugging is easier with bit indices that fit in i13 + sign.
 
-## working memory — session scoping and recency
-
-biological working memory is the active context — what the agent is currently thinking about. it's not a separate store; it's *attention* over the long-term store. sochdb supports this with two mechanisms.
-
-### session scoping
-
-every observation can be tagged with a `session_id`:
+### Encoder API
 
 ```rust
-db.observe(
-    "the user asked about deploying to staging",
-    ObserveOpts {
-        provenance: Some(Provenance {
-            session_id: Some("sess_abc123".into()),
-            ..Default::default()
-        }),
-        ..Default::default()
-    },
-).await?;
+pub fn from_name(name: &str) -> HV {
+    let hash = blake3::hash(name.as_bytes());
+    HV::from_seed(hash.as_bytes())
+}
+pub fn from_seed(seed: &[u8; 32]) -> HV {
+    let mut rng = ChaCha20Rng::from_seed(*seed);
+    let mut hv = HV::zero();
+    for bit_idx in 0..8192 {
+        if rng.gen_bool(0.5) { hv.set_bit(bit_idx); }
+    }
+    hv
+}
 ```
 
-queries can scope to a session, or boost results from a session:
+`from_name("Sarah")` deterministically produces the same 8192-bit HV every time. This is how agidb assigns concept HVs without a learned codebook.
+
+### v2.1 extension: HDC projection of dense latents
+
+In v2.1, dense latents from V-JEPA 2 (1024d), Wav2Vec-BERT (1024d), and Llama-3.2-3B (2048d) project to 8192-bit HVs via Charikar 2002 thresholded random projection. See [brain-alignment.md](./brain-alignment.md) for the math. The projected HVs participate in layer 1 retrieval identically to text-derived signatures.
+
+## Episode encoding (binding triples into one signature)
+
+A stored episode has zero or more triples. Each triple binds to a partial pattern; all triples bundle into the episode signature.
 
 ```rust
-// scope: only recall from this session
-db.recall(Query::cue("deploy")
-    .session_id("sess_abc123")
-    .session_only(true)
-).await?;
+pub fn bind_triple(triple: &Triple) -> HV {
+    let subj = concept_hv(&triple.subject);
+    let pred = predicate_hv(&triple.predicate);
+    let obj  = value_hv(&triple.object);
 
-// boost: include all results, but rank current session higher
-db.recall(Query::cue("deploy")
-    .session_id("sess_abc123")
-    .session_boost(2.0)
-).await?;
+    ROLE_SUBJ.bind(&subj)
+        ^ ROLE_PRED.bind(&pred)
+        ^ ROLE_OBJ.bind(&obj)
+}
+
+pub fn encode_episode_signature(triples: &[Triple]) -> HV {
+    let triple_sigs: Vec<HV> = triples.iter().map(bind_triple).collect();
+    if triple_sigs.is_empty() {
+        return HV::zero();
+    }
+    bundle(&triple_sigs)
+}
 ```
 
-### recency weighting
+`ROLE_SUBJ`, `ROLE_PRED`, `ROLE_OBJ` are workspace-init seeded random HVs, fixed for the database lifetime.
 
-even without explicit session scoping, sochdb applies a small recency boost by default. the formula:
+Why bundling: a single episode often has multiple triples. Bundling produces one signature similar to all the triple bindings, retrievable by any of them. Example: episode "Sarah said Bawri is thai and Bawri is in Bandra" has two triples. The bundled signature matches partial queries about Sarah, Bawri, thai, or Bandra.
+
+### v2.1: multimodal episode encoding
+
+In v2.1, the episode signature additionally binds modality components:
+
+```rust
+pub fn encode_multimodal_episode(
+    text_triples: &[Triple],
+    video_sig: Option<HV>,
+    audio_sig: Option<HV>,
+    text_sig: Option<HV>,
+    goal_id: Option<GoalId>,
+    belief_ids: &[BeliefId],
+    time_bucket: TimeBucket,
+) -> HV {
+    let mut episode = encode_episode_signature(text_triples);
+
+    if let Some(sv) = video_sig { episode ^= ROLE_VIDEO.bind(&sv); }
+    if let Some(sa) = audio_sig { episode ^= ROLE_AUDIO.bind(&sa); }
+    if let Some(st) = text_sig  { episode ^= ROLE_TEXT.bind(&st); }
+    if let Some(g) = goal_id    { episode ^= ROLE_GOAL.bind(&goal_signature(g)); }
+    for b in belief_ids         { episode ^= ROLE_BELIEF.bind(&belief_signature(*b)); }
+    episode ^= ROLE_TIME.bind(&time_signature(time_bucket));
+
+    episode
+}
+```
+
+The bundle stays factorable: any component can be recovered via XOR with its ROLE_* HV, cleaned up via nearest-neighbor lookup in the relevant codebook. See [neurosymbolic.md](./neurosymbolic.md) for the full factorization mechanics.
+
+## The tiered cascade
+
+Recall never returns the empty set (constitution article VI). It falls through tiers until it finds matches or hits the `tier_floor`:
 
 ```
-final_confidence = base_confidence × recency_factor
-
-recency_factor = 1.0 + 0.2 × exp(-Δt / τ)
+Tier A — Exact         canonical entity match via concept index
+                       confidence 1.0
+Tier B — Similarity    HDC structured signature similarity,
+                       POPCOUNT over inverted-index intersection
+                       confidence band [0.6, 0.95]
+Tier C — Gist          raw-text gist signature similarity
+                       confidence band [0.3, 0.6]
+Tier D — Nearest       best-effort nearest neighbors,
+                       low_confidence flag, confidence ≤ 0.3
 ```
 
-where Δt is the time since the episode's transaction time and τ is a half-life parameter (default: 1 hour for working-memory feel, configurable up to 7 days for longer-horizon memory).
+### Tier A — Exact concept match
 
-this gives recent episodes a small confidence boost without overwhelming high-confidence older episodes. "what did i just say?" surfaces the last few observations; "what does sarah like?" pulls in older consolidated knowledge with equal weight.
+If the cue contains a known concept name (resolved via the concept index), retrieve all episodes referencing that concept's `ConceptId`. Returned with confidence 1.0.
 
-### the result — working-memory feel without a separate store
+```rust
+async fn tier_a(&self, query: &Query) -> Result<Vec<RecallMatch>> {
+    if let Some(name) = &query.entity_name {
+        if let Some(concept_id) = self.store.lookup_concept(name).await? {
+            return self.store.episodes_for_concept(concept_id).await;
+        }
+    }
+    Ok(vec![])
+}
+```
 
-with these two mechanisms, an agent using sochdb gets:
+Phase 4 ships this.
 
-- a session feels live — recent observations rank higher than equivalent older ones
-- the agent can scope to "what happened in this conversation" or open up to "what do we know in general"
-- there is no separate working-memory store to manage, evict, or sync with long-term storage
+### Tier B — Structured signature similarity
 
-this is the brain's pattern: working memory is not a separate substrate; it's the recently-activated part of the same memory system, with elevated attention.
+If extraction (layer 2) can build a partial triple from the cue, encode that as a partial signature and find episodes whose stored signatures have high overlap.
 
-## next reads
+```rust
+async fn tier_b(&self, query: &Query) -> Result<Vec<RecallMatch>> {
+    let partial_sig = encode_partial_signature(&query.extracted_triples)?;
+    let candidates = self.inverted_index_intersection(&partial_sig).await?;
+    let mut scored = vec![];
+    for ep_id in candidates {
+        let ep_sig = self.store.load_signature(ep_id)?;
+        let sim = ep_sig.similarity(&partial_sig);
+        if sim > 0.6 { scored.push((ep_id, sim)); }
+    }
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    Ok(scored.into_iter().take(query.k).map(|(id, conf)| RecallMatch::new(id, conf, Tier::Similarity)).collect())
+}
+```
 
-- [LAYER_2_EXTRACTION.md](./layer-2-extraction.md) — how triples get extracted before binding
-- [LAYER_3_STORAGE.md](./layer-3-storage.md) — how signatures live on disk
-- [TECH_SPEC.md](../spec/tech-spec.md) — the rust types and traits
+Phase 3 (extraction) unlocks tier B. The inverted index by bit-set membership prevents scanning all signatures every query.
+
+### Tier C — Gist signature similarity
+
+Every episode also has a gist signature derived from a hash of bigrams/trigrams of its raw text. Tier C searches by gist similarity when the structured tier finds nothing.
+
+```rust
+async fn tier_c(&self, query: &Query) -> Result<Vec<RecallMatch>> {
+    let gist_sig = encode_gist_signature(&query.cue_text);
+    let mut scored = vec![];
+    for (ep_id, ep_gist) in self.store.all_gists().await? {
+        let sim = ep_gist.similarity(&gist_sig);
+        if sim > 0.3 { scored.push((ep_id, sim)); }
+    }
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    Ok(scored.into_iter().take(query.k).map(|(id, conf)| RecallMatch::new(id, conf, Tier::Gist)).collect())
+}
+```
+
+Phase 4 ships this. For >1M episodes, replace the full scan with LSH (v0.3+).
+
+### Tier D — Nearest-neighbor fallback
+
+Best-effort. Even if tier B and tier C find nothing above their thresholds, return the closest matches with `low_confidence: true`. Agents always get *something* to work with.
+
+```rust
+async fn tier_d(&self, query: &Query) -> Result<Vec<RecallMatch>> {
+    let cue_sig = encode_gist_signature(&query.cue_text);
+    let mut all_episodes = self.store.recent_episodes(query.recency_window).await?;
+    all_episodes.sort_by_key(|ep| ep.gist_signature.hamming(&cue_sig));
+    Ok(all_episodes.into_iter().take(query.k).map(|ep|
+        RecallMatch::new(ep.id, 0.2, Tier::NearestNeighbor)
+            .with_low_confidence_flag()
+    ).collect())
+}
+```
+
+Phase 4 ships this.
+
+### The full recall cascade
+
+```rust
+pub async fn recall(&self, query: Query) -> Result<Recall> {
+    let start = Instant::now();
+    let mut matches = self.tier_a(&query).await?;
+
+    if matches.is_empty() && query.tier_floor <= Tier::Similarity {
+        matches = self.tier_b(&query).await?;
+    }
+    if matches.is_empty() && query.tier_floor <= Tier::Gist {
+        matches = self.tier_c(&query).await?;
+    }
+    if matches.is_empty() && query.tier_floor <= Tier::NearestNeighbor {
+        matches = self.tier_d(&query).await?;
+    }
+
+    let tier_used = matches.first().map(|m| m.tier).unwrap_or(Tier::Exact);
+    matches = self.apply_goal_bias(matches).await?;
+    matches = self.apply_recency_boost(matches, &query).await?;
+    matches = self.apply_bitemporal_filter(matches, &query).await?;
+    matches.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
+    matches.truncate(query.k);
+
+    let attention_trace = if query.trace_attention {
+        Some(self.build_attention_trace(&query, &matches).await?)
+    } else { None };
+    if let Some(ref t) = attention_trace {
+        self.emit_learning_event(LearningEvent::AttentionTraced { recall_id: t.id, signatures_considered: t.candidates.len(), at: Utc::now() }).await?;
+    }
+
+    let semantic_atoms = self.recall_semantic_atoms(&query).await?;
+    let beliefs = self.recall_beliefs(&query).await?;
+    let active_goals = self.active_goals_for_query(&query).await?;
+
+    Ok(Recall {
+        matches, semantic_atoms, beliefs, active_goals,
+        tier_used,
+        elapsed_ms: start.elapsed().as_millis() as u32,
+        attention_trace,
+    })
+}
+```
+
+## Goal-biased retrieval (floor 6 → layer 1)
+
+When active goals exist, their HDC signatures up-weight related matches.
+
+```rust
+async fn apply_goal_bias(&self, mut matches: Vec<RecallMatch>) -> Result<Vec<RecallMatch>> {
+    let active_goals = self.active_goals().await?;
+    if active_goals.is_empty() { return Ok(matches); }
+    let goal_sig = bundle(&active_goals.iter().map(|g| g.signature.clone()).collect::<Vec<_>>());
+    for m in matches.iter_mut() {
+        let ep_sig = self.store.load_signature(m.episode_id)?;
+        let bias = ep_sig.similarity(&goal_sig) * GOAL_BIAS_WEIGHT;
+        m.confidence = (m.confidence * (1.0 + bias)).min(1.0);
+        m.goal_biased = bias > 0.05;
+    }
+    Ok(matches)
+}
+```
+
+`GOAL_BIAS_WEIGHT` default 0.3. Tunable per-query via `Query::with_goal_bias(weight)`.
+
+Mirrors PFC's role in biasing attention toward goal-relevant memories (Miller & Cohen 2001).
+
+## Bi-temporal filtering
+
+Every recall has implicit (or explicit) `valid_as_of` and `transaction_as_of` timestamps. Episodes outside the valid window or superseded as of the transaction time are filtered.
+
+```rust
+async fn apply_bitemporal_filter(
+    &self, mut matches: Vec<RecallMatch>, query: &Query
+) -> Result<Vec<RecallMatch>> {
+    let valid_t = query.valid_as_of.unwrap_or_else(Utc::now);
+    let tx_t = query.transaction_as_of.unwrap_or_else(Utc::now);
+    matches.retain(|m| {
+        let ep = self.store.episode(m.episode_id).unwrap();
+        ep.is_valid_at(valid_t) && !ep.is_superseded_at(tx_t) && ep.tombstoned_at.map_or(true, |t| t > tx_t)
+    });
+    Ok(matches)
+}
+```
+
+## Attention trace (floor 7 audit)
+
+When `query.trace_attention = true`, agidb records which signatures were considered, which scored highest, and why each was retained or rejected. The trace lands in floor 7's learning log; the agent can later ask "what was I attending to during recall_id X?"
+
+```rust
+pub struct AttentionTrace {
+    pub id: RecallId,
+    pub query: Query,
+    pub candidates: Vec<AttentionCandidate>,
+    pub goal_signature: Option<HV>,
+    pub recency_window: Duration,
+    pub timestamp: DateTime<Utc>,
+}
+
+pub struct AttentionCandidate {
+    pub episode_id: EpisodeId,
+    pub similarity: f32,
+    pub goal_bias: f32,
+    pub recency_boost: f32,
+    pub final_confidence: f32,
+    pub retained: bool,
+    pub rejection_reason: Option<String>,
+}
+```
+
+Default off (overhead). Opt-in for debugging, RL exploration tracking, or compliance auditing.
+
+## Performance characteristics
+
+| Operation | 100k episodes | 1M episodes | Implementation |
+|---|---|---|---|
+| Tier A | < 1ms | < 1ms | concept index hash lookup |
+| Tier B (with extraction) | ~10ms | ~50ms | inverted index intersection + POPCOUNT |
+| Tier C | ~5ms | ~50ms (with LSH ~10ms) | full gist scan (LSH at scale) |
+| Tier D | ~5ms | ~50ms | bounded recency window scan |
+| Goal-bias pass | < 1ms | < 5ms | one similarity per match (k=20) |
+| Bi-temporal filter | < 1ms | < 5ms | redb point lookups |
+| Attention trace build | ~5ms | ~10ms | only if enabled |
+| **Total p95** | **< 50ms** | **< 100ms** | target |
+
+These are CPU-only measurements. No GPU. No external services. No LLM calls.
+
+## What this layer doesn't do
+
+- **Extract entities and relations from text.** That's layer 2 (`agidb-extract`).
+- **Encode video/audio to dense latents.** That's layer 2 in v2.1 (`agidb-sensory`).
+- **Persist anything to disk.** That's layer 3 (`agidb-core::store`).
+- **Decide when to consolidate.** That's the consolidation worker (separate module).
+- **Run any LLM.** Read path is deterministic math (constitution article IV).
+
+## What enables what (the dependency graph)
+
+```
+HDC kernel (phase 1, done)
+   ↓
+Episode encoding (phase 4, done)
+   ↓
+Tier A + C + D recall (phase 4, done)
+   ↓
+Goal-bias + recency + bi-temporal filtering (phase 4, done)
+
+Tier B recall (phase 4, blocked on phase 3)
+   ↓
+Triple extraction (phase 3) ─────────────┐
+                                          ↓
+                                  Belief extraction (phase 9)
+                                          ↓
+                                  Goal-biased recall fully active
+
+Multimodal episode encoding (phase 14) — v2.1
+   ↓
+Multimodal recall (phase 14) — v2.1 unbind for per-modality search
+
+Attention trace (phase 10)
+   ↓
+Self-model floor 7 fully active
+
+Cognitive benchmark suite (phase 13)
+   ↓
+Decision gate (phase 7)
+
+BAMS benchmark (phase 16) — v2.1
+   ↓
+v2.1 milestone, ICLR 2026 MemAgents paper
+```
+
+## Why layer 1 is the wedge
+
+Every other agent memory system embeds its similarity layer in either an LLM API call or a vector DB query. agidb's similarity layer is **CPU-local POPCOUNT over 1KB signatures**. Three orders of magnitude faster than the API-call path. Three orders of magnitude cheaper. Zero external dependencies in the read path.
+
+That's the wedge. Layer 1 is what makes agidb the substrate that gets the latency, the cost, the offline operation, the determinism. Everything else (cognitive primitives, brain-alignment, BAMS) is built on this layer's properties.
+
+The v2.1 multimodal extension stays purely on layer 1: dense latents from V-JEPA 2 / Wav2Vec-BERT / Llama-3.2-3B project to 8192-bit HVs, then layer 1 retrieval works identically. The encoder pipeline is layer 2 in v2.1; the math at the retrieval level is the same as v2.0.
+
+That's why brain-alignment is additive (constitution article XVIII). Layer 1 isn't getting rewritten for v2.1; it's getting a new write-path input source. The fundamental retrieval math stays exactly the same.

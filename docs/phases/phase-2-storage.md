@@ -1,7 +1,7 @@
 # phase 2 — storage
 
-**duration:** weeks 3-4
-**status:** not started
+**duration:** weeks — (inherited from sochdb v1)
+**status:** complete (inherited from sochdb v1)
 **depends on:** [phase 1](./phase-1-hdc-kernel.md)
 
 ## goal
@@ -10,7 +10,7 @@ land layer 3: redb metadata + mmap'd signatures + bi-temporal schema. open, obse
 
 ## deliverables
 
-- [ ] `sochdb-core/src/store.rs` with redb tables:
+- [x] `agidb-core/src/store.rs` with redb tables:
   - `episodes` — episode_id → row (text, signature_offset, triples, timestamps, provenance, confidence)
   - `triples` — triple_id → row (subject, predicate, object, confidence, episode_id)
   - `concepts` — concept_id → canonical_name + aliases + entity_type
@@ -18,13 +18,13 @@ land layer 3: redb metadata + mmap'd signatures + bi-temporal schema. open, obse
   - `inverted_index` — active_dim → roaring_bitmap of episode_ids
   - `semantic_atoms` — atom_id → row (statement, concept, evidence_count, last_seen, signature_offset)
   - `consolidation_log` — append-only audit
-- [ ] `sochdb-core/src/signatures.rs` — `signatures.dat` with append + offset lookup; memmap2-backed
-- [ ] bi-temporal columns on every fact: `t_valid_start`, `t_valid_end`, `t_tx_start`, `superseded_by`
-- [ ] crash-safety tests:
+- [x] `agidb-core/src/signatures.rs` — `signatures.dat` with append + offset lookup; memmap2-backed
+- [x] bi-temporal columns on every fact: `t_valid_start`, `t_valid_end`, `t_tx_start`, `superseded_by`
+- [x] crash-safety tests:
   - kill mid-write → reopen recovers consistently
   - torn writes detected via redb checksum
-- [ ] export / import via jsonl (`sochdb export`, `sochdb import`)
-- [ ] `manifest.toml` with `format_version`
+- [x] export / import via jsonl (`agidb export`, `agidb import`)
+- [x] `manifest.toml` with `format_version`
 
 ## exit criterion
 
@@ -37,7 +37,7 @@ land layer 3: redb metadata + mmap'd signatures + bi-temporal schema. open, obse
 3. implement append-only signatures.dat
 4. wire redb tables behind a `Store` trait
 5. write the placeholder regex extractor (5 patterns, throwaway — phase 3 replaces it)
-6. wire `Sochdb::open` / `observe` / `close` / `recall_exact`
+6. wire `Agidb::open` / `observe` / `close` / `recall_exact`
 7. write the crash-safety harness using `nix::sys::signal::kill` against a child process
 8. land export/import to jsonl
 

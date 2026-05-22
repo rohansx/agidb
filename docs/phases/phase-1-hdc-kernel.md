@@ -1,7 +1,7 @@
 # phase 1 — the HDC kernel
 
-**duration:** weeks 1-2
-**status:** not started
+**duration:** weeks — (inherited from sochdb v1)
+**status:** complete (inherited from sochdb v1)
 **depends on:** [phase 0](./phase-0-setup.md)
 
 ## goal
@@ -10,21 +10,21 @@ land the smallest correct HDC kernel — the math that makes layer 1 work. no st
 
 ## deliverables
 
-- [ ] `sochdb-core/src/hdc.rs` with the `HV` type and:
+- [x] `agidb-core/src/hdc.rs` with the `HV` type and:
   - `from_name(&str) -> HV` — deterministic hash-derived hypervector
   - `bind(&HV, &HV) -> HV` — XOR binding
   - `bundle(&[HV]) -> HV` — per-bit majority bundling
   - `hamming(&self, &HV) -> u32` — hamming distance
   - `similarity(&self, &HV) -> f32` — derived from hamming
   - `active_dims(&self) -> impl Iterator<Item = u32>` — indices of set bits
-- [ ] AVX-512 POPCOUNT path behind `target_feature = "avx512vpopcntdq"`
-- [ ] NEON POPCOUNT path for aarch64 / Apple silicon
-- [ ] portable fallback using `u64::count_ones()` over 128 chunks
-- [ ] property tests via `proptest`:
+- [x] AVX-512 POPCOUNT path behind `target_feature = "avx512vpopcntdq"`
+- [x] NEON POPCOUNT path for aarch64 / Apple silicon
+- [x] portable fallback using `u64::count_ones()` over 128 chunks
+- [x] property tests via `proptest`:
   - binding is its own inverse: `a.bind(&b).bind(&b) == a`
   - bundling membership: each bundled HV has high similarity to the bundle
   - bundling commutativity: `bundle([a,b,c]) == bundle([c,a,b])`
-- [ ] micro-benchmarks via `criterion`:
+- [x] micro-benchmarks via `criterion`:
   - signature compute (`from_name`)
   - single bind, single bundle of N
   - hamming over 100k stored signatures

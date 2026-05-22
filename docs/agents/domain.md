@@ -4,7 +4,7 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-- **`CONTEXT.md`** at the repo root (single-context layout — sochdb is one project, one engine, one workspace)
+- **`CONTEXT.md`** at the repo root (single-context layout — agidb is one project, one engine, one workspace)
 - **`docs/adr/`** — read ADRs that touch the area you're about to work in
 - **`docs/spec/constitution.md`** — the immutable principles (symlinked into `.specify/memory/constitution.md`)
 - **`docs/architecture/`** — the three-layer architecture and per-layer details

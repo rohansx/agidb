@@ -1,6 +1,12 @@
-# sochdb — Claude Code instructions
+# agidb — Claude Code instructions
 
-> sochdb is an embedded, content-addressable memory database for AI agents — Rust top to bottom, single binary, no query language. See [`README.md`](./README.md) for the user-facing pitch, [`docs/README.md`](./docs/README.md) for the doc tree, and [`.specify/memory/constitution.md`](./.specify/memory/constitution.md) for the immutable principles.
+> agidb is a cognitive substrate for autonomous AI agents — content-addressable hyperdimensional memory with first-class goals and beliefs, bi-temporal supersession, sleep-like consolidation, and a non-destructive unlearn primitive. Rust top to bottom, single binary, no query language. See [`README.md`](./README.md) for the user-facing pitch, [`docs/README.md`](./docs/README.md) for the doc tree, and [`.specify/memory/constitution.md`](./.specify/memory/constitution.md) for the immutable principles.
+
+## Naming (transitional)
+
+The project is **agidb v2** — an expansion of sochdb v1 (see [ADR-0003](./docs/adr/0003-agidb-v2-constitution.md)). All documentation uses the name **agidb**. The code does not yet: the crates under `crates/` are still named `sochdb-*` (`sochdb-core`, `sochdb-extract`, …). Renaming the crates, error types, manifest strings, and namespaces is the **pre-week-0** task in [`docs/product/roadmap.md`](./docs/product/roadmap.md).
+
+Until that task runs: write **agidb** in docs and prose; use the **actual `sochdb-*` crate names** when referring to or importing code. The gap is intentional and tracked — not drift.
 
 ## Before changing anything
 
@@ -12,7 +18,7 @@
 
 ### Issue tracker
 
-Issues for sochdb live as GitHub issues at `github.com/sochdb/sochdb` (transitional: local markdown under `.scratch/` until the remote is configured). See [`docs/agents/issue-tracker.md`](./docs/agents/issue-tracker.md).
+Issues for agidb live as GitHub issues at `github.com/agidb/agidb` (transitional: local markdown under `.scratch/` until the remote is configured — the `agidb` org is created in the pre-week-0 rebrand). See [`docs/agents/issue-tracker.md`](./docs/agents/issue-tracker.md).
 
 ### Triage labels
 
@@ -37,8 +43,8 @@ This project uses GitHub Spec-Kit. The constitution is canonical at [`.specify/m
 
 ## House rules
 
-- **Rust top to bottom in `sochdb-core`.** No Python or JavaScript. ONNX runtime via `ort` is the only permitted FFI.
-- **No LLM in the read path.** `recall`, `what_about`, `between`, `recall_procedure` must be deterministic.
+- **Rust top to bottom in the core crate** (`sochdb-core`, renaming to `agidb-core`). No Python or JavaScript. ONNX runtime via `ort` is the only permitted FFI.
+- **No LLM in the read path.** `recall`, `what_about`, `between`, `recall_procedure` must be deterministic. (Constitution Article IV, amended for v2: LLMs are permitted at *write* time for belief revision and consolidation only.)
 - **Test-first.** Property tests for HDC algebra, unit tests for each crate, integration tests for the public API. CI runs unit + property on every PR.
 - **Benchmark honestly.** Every public claim ships with the full six-metric stack (BLEU + F1 + LLM-judge + token cost + p95 latency + noisy-cue) and raw logs.
 - **Commits**: conventional commit prefixes (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`, `perf:`, `ci:`). No attribution lines (disabled globally).

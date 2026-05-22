@@ -1,12 +1,12 @@
 # phase 7 — decision gate
 
-**duration:** week 12 (compressed; benchmark runs only)
+**duration:** weeks 11-13
 **status:** not started
 **depends on:** [phase 6](./phase-6-consolidation.md), [phase 5](./phase-5-mcp-python.md)
 
 ## goal
 
-run sochdb head-to-head against Mem0, Zep/Graphiti, and Letta on a shared harness. publish raw logs. decide whether to **commit**, **reposition**, or **retreat**.
+run agidb head-to-head against Mem0, Zep/Graphiti, and Letta on a shared harness. publish raw logs. decide whether to **commit**, **reposition**, or **retreat**.
 
 this is the most important phase. the entire 6-month bet collapses to one week of benchmarks.
 
@@ -35,7 +35,7 @@ all raw logs ship with each metric. harness commit hash recorded. baseline syste
 
 ## deliverables
 
-- [ ] `sochdb-bench` workspace crate with:
+- [ ] `agidb-bench` workspace crate with:
   - LongMemEval-S harness
   - LoCoMo harness
   - BEAM harness
@@ -52,10 +52,10 @@ all raw logs ship with each metric. harness commit hash recorded. baseline syste
 
 **all three must hold:**
 
-- sochdb ≥ Zep/Graphiti accuracy on LongMemEval-S (F1 within 1pp **and** LLM-judge within 1pp)
-- sochdb ≥ 3× lower p95 recall latency than Mem0
-- sochdb ≥ 3× lower token cost than Mem0 (target: < 2,500 tokens/query against Mem0's ~7k)
-- sochdb wins on the noisy-cue degradation test (graceful tier-C/D fallback is the whole point)
+- agidb ≥ Zep/Graphiti accuracy on LongMemEval-S (F1 within 1pp **and** LLM-judge within 1pp)
+- agidb ≥ 3× lower p95 recall latency than Mem0
+- agidb ≥ 3× lower token cost than Mem0 (target: < 2,500 tokens/query against Mem0's ~7k)
+- agidb wins on the noisy-cue degradation test (graceful tier-C/D fallback is the whole point)
 
 if met:
 - proceed to [phase 8](./phase-8-hardening-launch.md) (hardening + launch)
@@ -64,7 +64,7 @@ if met:
 
 ### reposition threshold — ship smaller
 
-sochdb within 3pp of Mem0 accuracy on LongMemEval-S **and** ≥ 10× memory footprint savings.
+agidb within 3pp of Mem0 accuracy on LongMemEval-S **and** ≥ 10× memory footprint savings.
 
 if met but commit threshold isn't:
 - reposition as "embedded memory for edge agents"
@@ -73,12 +73,12 @@ if met but commit threshold isn't:
 
 ### retreat threshold — fold back into ctxgraph
 
-sochdb more than 10pp behind dense baselines on LongMemEval-S **and** the gap doesn't close with reranking.
+agidb more than 10pp behind dense baselines on LongMemEval-S **and** the gap doesn't close with reranking.
 
 if hit:
 - drop the HDC bet
 - reposition as "Graphiti without Neo4j"
-- merge sochdb learnings back into ctxgraph
+- merge agidb learnings back into ctxgraph
 - continue Utkrusht day job full time
 
 ## the rule

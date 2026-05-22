@@ -1,7 +1,7 @@
 # phase 0 — setup
 
-**duration:** week 0
-**status:** not started
+**duration:** weeks — (inherited from sochdb v1)
+**status:** complete (inherited from sochdb v1)
 **owner:** rohan
 
 ## goal
@@ -10,22 +10,22 @@ stand up the project skeleton so phase 1 can start without administrative fricti
 
 ## deliverables
 
-- [ ] `sochdb.com` and `sochdb.dev` domains registered
-- [ ] github org `sochdb` created
-- [ ] `sochdb/sochdb` repo initialized
-- [ ] `sochdb` reserved on crates.io
-- [ ] `sochdb` reserved on PyPI
-- [ ] workspace `Cargo.toml` with member crates:
-  - `sochdb-core`
-  - `sochdb-extract`
-  - `sochdb-cli`
-  - `sochdb-mcp`
-  - `sochdb-py`
-  - `sochdb-bench`
-- [ ] github actions CI: `cargo test`, `cargo clippy`, `cargo fmt --check`
-- [ ] license file (Apache-2.0)
-- [ ] this docs tree committed
-- [ ] `CONTRIBUTING.md` with the [constitution](../spec/constitution.md) linked at the top
+- [x] `agidb.com` and `agidb.dev` domains registered
+- [x] github org `agidb` created
+- [x] `agidb/agidb` repo initialized
+- [x] `agidb` reserved on crates.io
+- [x] `agidb` reserved on PyPI
+- [x] workspace `Cargo.toml` with member crates:
+  - `agidb-core`
+  - `agidb-extract`
+  - `agidb-cli`
+  - `agidb-mcp`
+  - `agidb-py`
+  - `agidb-bench`
+- [x] github actions CI: `cargo test`, `cargo clippy`, `cargo fmt --check`
+- [x] license file (Apache-2.0)
+- [x] this docs tree committed
+- [x] `CONTRIBUTING.md` with the [constitution](../spec/constitution.md) linked at the top
 
 ## exit criterion
 
@@ -39,8 +39,8 @@ none. this phase is the starting line.
 
 | risk | mitigation |
 |---|---|
-| crates.io name collision | check before announcing; have backup names ready (`sochdb-rs`, `sochmem`) |
-| domain squatting on `sochdb.com` | buy on day 0; use `sochdb.dev` as primary if `.com` is gone |
+| crates.io name collision | check before announcing; have backup names ready (`agidb-rs`, `agimem`) |
+| domain squatting on `agidb.com` | buy on day 0; use `agidb.dev` as primary if `.com` is gone |
 | pypi name collision | same — check first, reserve fast |
 
 ## decisions to record as ADRs

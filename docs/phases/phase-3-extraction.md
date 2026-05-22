@@ -1,6 +1,6 @@
 # phase 3 — extraction
 
-**duration:** weeks 5-6
+**duration:** weeks 1-4
 **status:** not started
 **depends on:** [phase 2](./phase-2-storage.md)
 
@@ -11,7 +11,7 @@ land layer 2: replace the phase-2 regex placeholder with a real GLiNER ONNX pipe
 ## deliverables
 
 - [ ] vendor / port the GLiNER ONNX loading and inference code from ctxgraph
-- [ ] `sochdb-extract/src/lib.rs` with the `Extraction` pipeline:
+- [ ] `agidb-extract/src/lib.rs` with the `Extraction` pipeline:
   - entity extraction with type labels (Person, Place, Organization, etc.)
   - relation extraction producing `(subject, predicate, object)` triples
   - time anchor parsing via chrono + small grammar ("last weekend", "yesterday", "in 2024")

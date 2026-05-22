@@ -1,4 +1,4 @@
-# sochdb domain glossary
+# agidb domain glossary
 
 > The vocabulary every doc, comment, identifier, test name, and PR title should use. If a term you need isn't here, either add it (one-line PR) or you're inventing language the project doesn't use — reconsider.
 >
@@ -8,11 +8,11 @@
 
 **HV (Hypervector)** — A fixed-size binary vector of [`D = 8192`] bits / [`D_BYTES = 1024`] bytes, cache-line-aligned. The unit of representation in layer 1. Two HVs derived from unrelated names are uncorrelated in expectation (hamming ≈ D/2).
 
-**Episode** — A single observation as stored by sochdb. Carries the raw text, an HDC signature offset (into `signatures.dat`), an extracted list of Triples, bi-temporal stamps (`t_valid_start`, `t_valid_end`, `t_tx_start`), a `superseded_by` link if applicable, a Provenance record, and a confidence score. Identified by an `EpisodeId`.
+**Episode** — A single observation as stored by agidb. Carries the raw text, an HDC signature offset (into `signatures.dat`), an extracted list of Triples, bi-temporal stamps (`t_valid_start`, `t_valid_end`, `t_tx_start`), a `superseded_by` link if applicable, a Provenance record, and a confidence score. Identified by an `EpisodeId`.
 
 **Triple** — A `(subject, predicate, object)` tuple extracted from natural-language input by layer 2. Each triple carries its own confidence score and a back-reference to its source Episode.
 
-**Concept** — A canonical entity (e.g. "Sarah", "Bawri") with a deterministic HV (via `HV::from_name`), a canonical name, a list of aliases, and an entity type. Identified by a `ConceptId`. Concepts are how sochdb canonicalizes mentions across episodes — "Sarah said X" and "sarah_kelly mentioned X" land on the same `ConceptId`.
+**Concept** — A canonical entity (e.g. "Sarah", "Bawri") with a deterministic HV (via `HV::from_name`), a canonical name, a list of aliases, and an entity type. Identified by a `ConceptId`. Concepts are how agidb canonicalizes mentions across episodes — "Sarah said X" and "sarah_kelly mentioned X" land on the same `ConceptId`.
 
 **SemanticAtom** — A consolidated fact produced by the consolidation loop. Bundles repeated episodic patterns (N ≥ 3) into one durable statement with `evidence_count`, a list of source `EpisodeId`s for provenance, a confidence score, and a `last_referenced` timestamp. Identified by a `SemanticAtomId`.
 
@@ -24,11 +24,11 @@
 
 **Bi-temporal** — Every fact has two time axes:
 - `t_valid_start` / `t_valid_end` — *valid time*: when this fact was true in the world
-- `t_tx_start` — *transaction time*: when sochdb learned it
+- `t_tx_start` — *transaction time*: when agidb learned it
 
-Queries can be issued "as of" any historical date along either axis. This is how sochdb answers "what did we believe about X on date Y?" without losing earlier facts.
+Queries can be issued "as of" any historical date along either axis. This is how agidb answers "what did we believe about X on date Y?" without losing earlier facts.
 
-**Supersession** — How sochdb handles contradictions. When a new fact disagrees with an old one with the same `(subject, predicate)` and overlapping valid time, the old fact gets `t_valid_end = now - 1ms` and `superseded_by = <new id>`; the new fact gets `t_valid_start = now`. The old fact is preserved, not overwritten — see [`docs/spec/constitution.md`](./docs/spec/constitution.md) article V.
+**Supersession** — How agidb handles contradictions. When a new fact disagrees with an old one with the same `(subject, predicate)` and overlapping valid time, the old fact gets `t_valid_end = now - 1ms` and `superseded_by = <new id>`; the new fact gets `t_valid_start = now`. The old fact is preserved, not overwritten — see [`docs/spec/constitution.md`](./docs/spec/constitution.md) article V.
 
 **Decay** — Background process that reduces a SemanticAtom's confidence over time when it isn't referenced. Atoms whose confidence falls below the floor get archived (cold storage), not deleted.
 
@@ -70,7 +70,7 @@ Queries can be issued "as of" any historical date along either axis. This is how
 
 ## Five biological tiers (orthogonal to layers)
 
-**Sensory memory** — Raw signal, <1s. Upstream of sochdb. Out of scope.
+**Sensory memory** — Raw signal, <1s. Upstream of agidb. Out of scope.
 
 **Working memory** — Active context, ~7 items. Modeled as session-scoped recall with `session_boost` + recency weighting.
 
@@ -82,12 +82,12 @@ Queries can be issued "as of" any historical date along either axis. This is how
 
 ## Out-of-scope terms
 
-If you see these in a draft, redirect the writer — they describe categories sochdb is explicitly **not** ([constitution article XII](./.specify/memory/constitution.md)):
+If you see these in a draft, redirect the writer — they describe categories agidb is explicitly **not** ([constitution article XII](./.specify/memory/constitution.md)):
 
-- **OLTP / transactional store** — sochdb is not a system of record for orders or payments
+- **OLTP / transactional store** — agidb is not a system of record for orders or payments
 - **Full-text search** — use tantivy or elastic
 - **Pure similarity search over fixed embeddings** — use lancedb / qdrant
-- **Document RAG** — sochdb stores observations, not documents
-- **Query language / DSL** — sochdb has functions; no SQL, no Cypher
+- **Document RAG** — agidb stores observations, not documents
+- **Query language / DSL** — agidb has functions; no SQL, no Cypher
 - **Distributed / sharded** — single-node only in v0.x
 - **Multimodal** — text first; images / audio deferred to v0.3+

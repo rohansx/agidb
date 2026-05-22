@@ -1,12 +1,12 @@
 # Architecture Decision Records (ADRs)
 
-This directory holds the durable, dated record of every non-trivial architectural decision in sochdb.
+This directory holds the durable, dated record of every non-trivial architectural decision in agidb.
 
 ## When to write one
 
 Write an ADR when:
 
-- a constitutional principle is amended (see [`../spec/constitution.md`](../spec/constitution.md) article XV)
+- a constitutional principle is amended (see the amendment process in [`../spec/constitution.md`](../spec/constitution.md))
 - a new dependency, runtime, or storage primitive is chosen over alternatives
 - a backwards-incompatible change to the public API is being considered
 - a non-trivial tradeoff is being made and the *why* would not be obvious from the code
@@ -57,3 +57,4 @@ Links to PRs, issues, prior art, or related ADRs.
 |---|---|---|
 | [0001](./0001-license-apache-2.md) | License: Apache-2.0 | Accepted |
 | [0002](./0002-async-runtime-tokio.md) | Async runtime: tokio | Accepted |
+| [0003](./0003-agidb-v2-constitution.md) | Adopt the agidb v2 constitution | Accepted |

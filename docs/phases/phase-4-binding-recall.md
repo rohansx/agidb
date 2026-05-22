@@ -1,7 +1,7 @@
 # phase 4 — binding + tiered recall
 
-**duration:** weeks 7-8
-**status:** not started
+**duration:** weeks — (inherited from sochdb v1)
+**status:** complete (inherited from sochdb v1)
 **depends on:** [phase 3](./phase-3-extraction.md)
 
 ## goal
@@ -10,23 +10,23 @@ land the layer-1 read path end to end: bind triples into episode signatures, com
 
 ## deliverables
 
-- [ ] `sochdb-core/src/episode.rs`:
+- [x] `agidb-core/src/episode.rs`:
   - bind triples into role-filler patterns: `triple = (SUBJ⊗s) ⊕ (PRED⊗p) ⊕ (OBJ⊗o)`
   - bundle triples into an episode signature with a time-anchor binding
   - compute a parallel raw-text gist signature for tier C fallback
-- [ ] `sochdb-core/src/recall.rs`:
+- [x] `agidb-core/src/recall.rs`:
   - tier A — exact canonical entity match via `concept_index`
   - tier B — HDC similarity over `inverted_index ∩ candidate set`, POPCOUNT scan
   - tier C — raw-text gist signature similarity
   - tier D — nearest-neighbor with `low_confidence=true`
   - tier fall-through with explicit `tier_floor` honored
-- [ ] inverted-index update path on `observe`
-- [ ] confidence calibration:
+- [x] inverted-index update path on `observe`
+- [x] confidence calibration:
   - tier A: 1.0 - alias_distance / max_distance
   - tier B: hamming-derived (1 - h/D) with linear mapping to [0.6, 0.95]
   - tier C: lower band [0.3, 0.6]
   - tier D: capped at 0.3
-- [ ] 1,000-episode synthetic dataset generator + recall eval
+- [x] 1,000-episode synthetic dataset generator + recall eval
 
 ## exit criterion
 

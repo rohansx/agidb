@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and PRDs for this repo live as GitHub issues at `github.com/sochdb/sochdb` (to be created in [phase 0](../phases/phase-0-setup.md)). Use the `gh` CLI for all operations.
+Issues and PRDs for this repo live as GitHub issues at `github.com/agidb/agidb` (to be created in [phase 0](../phases/phase-0-setup.md)). Use the `gh` CLI for all operations.
 
 > **Transitional note:** until the GitHub remote is configured, treat issues as local-markdown drafts under `.scratch/<feature>/`. Re-run `setup-matt-pocock-skills` after the remote is set if you'd rather make that switch permanent.
 

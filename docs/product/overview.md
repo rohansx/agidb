@@ -1,142 +1,249 @@
-# sochdb — product overview
+# agidb — Overview
 
-## the problem
+> The product overview. What agidb is, who it's for, what it replaces, how it
+> compares to the competition, and why now. Brain-alignment is the v2.1
+> additive milestone, not the founding story.
 
-AI agents are getting longer-running, more autonomous, and more stateful. an agent that helps you write code, manage your inbox, or run your business needs to remember things across days, weeks, and years. it needs to remember what you told it, what it tried, what worked, who said what, and when.
+## What agidb is, in one minute
 
-today, every agent solves this badly. the standard pattern is:
+agidb is a database with a single purpose: be the persistent memory and cognitive state of an autonomous AI agent. It is not a vector database, not a graph database, not a key-value store. It is a **cognitive substrate** — built around the seven things an autonomous agent needs to persist (sensory input, working memory, episodic memories, semantic facts, procedural skills, goals and beliefs, and a self-model audit log), each as a first-class typed shape.
 
-1. embed every conversation into vectors
-2. store them in a vector database (Pinecone, Qdrant, Weaviate, pgvector)
-3. at recall time, embed the query, do similarity search, get back the top-k chunks
-4. optionally rerank with another LLM call
-5. stuff the chunks into the prompt and hope the model finds the right one
+The agent talks to agidb through one API: `observe()` to record, `recall()` to retrieve, `set_goal()` / `assert_belief()` / `unlearn()` for the cognitive primitives. No SQL. No Cypher. No embedding API calls. No separate vector store. No rerank step. Everything is local, deterministic, sub-50ms, with full provenance.
 
-this pipeline has six problems:
+agidb v2 inherits sochdb v1's working HDC kernel, bi-temporal storage, episode binding, tiered recall, and consolidation. The v2.0 pivot adds the cognitive primitives (goals, beliefs, sensory buffer, self-model, unlearn, neurosymbolic interface) that make it an AGI substrate. **agidb v2.1 extends this with brain-aligned multimodal sensory encoding** (V-JEPA 2 + Wav2Vec-BERT + Llama-3.2-3B, the same encoder stack as Meta FAIR's TRIBE v2 brain-encoding model) and ships the BAMS benchmark — the first agent memory evaluation grounded in human cortical activation patterns.
 
-- **latency.** every recall is multiple network calls. p95 is often 1-3 seconds. some systems (LangMem) hit 60 seconds.
-- **cost.** every recall is multiple embedding API calls plus context-window tokens. for an agent doing 10,000 recalls/day, this is a real bill.
-- **no temporal grounding.** vector dbs don't know what was true when. if you told the agent in January that you live in Mumbai, and in May that you moved to Berlin, a vector search for "where do I live" returns both with no way to know which is current.
-- **no provenance.** vector retrieval returns chunks of text without strong attribution. the agent can confidently claim a fact whose source is impossible to trace.
-- **no graceful degradation.** if the cosine similarity threshold isn't met, the query returns nothing. the agent then either hallucinates or asks the user a question it should have known the answer to.
-- **no consolidation.** the vector db grows without bound. there's no equivalent of sleep — no compaction of episodic memory into semantic memory, no decay of unused facts, no contradiction detection.
+## Who it's for
 
-these aren't bugs. they're properties of the wrong primitive. vector databases were designed for RAG over documents, not for agent memory over time.
+**Primary: developers building autonomous AI agents who have outgrown mem0/letta/zep.** Their pattern is: agent loop calls mem0 for memory, parses responses, glues in graphiti for relations, hand-rolls a vector store for embeddings, juggles three sets of credentials, hits 1-3 second p95 latencies on recall, and pays embedding API costs per query. They want one binary, one API, deterministic retrieval, and cognitive primitives the existing stack doesn't provide.
 
-## the solution
+**Secondary: teams building toward AGI.** Frontier-adjacent startups and research groups who need a substrate where goals, beliefs, and self-model are first-class types — not bolted on. The audience is smaller but higher-value, and the multi-year positioning is what justifies the AGIDB name.
 
-sochdb is a new database primitive designed specifically for agent memory. it replaces the six-step pipeline above with one function call.
+**Tertiary: developers in regulated industries.** Healthcare, legal, finance — anyone who needs auditable memory with full provenance, non-destructive updates, and an unlearn API to handle right-to-be-forgotten compliance. agidb is the first agent memory layer that takes these seriously from v0.1.
+
+**Also: local-first / offline-first builders.** Coding agents (Claude Code, Cursor), desktop assistants, on-device personal AIs — anyone who cannot depend on cloud services for memory. agidb is a single Rust binary, runs entirely local, no API keys.
+
+**New audience in v2.1: cognitive science researchers and NeuroAI labs.** Anyone benchmarking agent memory architectures against human cortical ground truth. agidb is the first system shipping with BAMS evaluation built in.
+
+## Who it's not for
+
+- People who want a general-purpose database. Use postgres.
+- People who want a knowledge graph editor with a UI. Use neo4j browser.
+- People who want pure document RAG with rerankers. Use any vector DB + cohere.
+- People who want a multimodal-document store. Use lancedb or weaviate.
+- People who want a hosted-only managed service. agidb is embedded-first; hosted is v0.4+.
+- People who want a distributed sharded database. agidb is single-node by design.
+
+Use the right tool for those problems, then put agidb on top.
+
+## What agidb replaces
+
+A typical agent memory stack today is six components glued together:
 
 ```
-sochdb.recall("what did sarah say about thai food?")
-   → returns the matching memory + confidence + provenance
+Agent → embedding API call → vector DB query →
+        graph DB query →
+        rerank LLM call →
+        synthesis LLM call →
+        result
 ```
 
-the call runs locally, in under 50 milliseconds on a laptop, with zero network calls. it returns matches with explicit confidence scores. if confidence is low, you know. if there's no match, you get the nearest neighbors anyway.
+p95 latency: 1-3 seconds. Per-query cost: $0.001-$0.01 in API calls. Provenance: weak. Temporal grounding: none. Goal awareness: zero. Belief revision: nobody handles it.
 
-sochdb integrates binding and recall without an external index — storage and retrieval share the same representation, so retrieval doesn't detour through a separate vector or graph lookup. this is the architectural wedge.
+agidb replaces all six with one local function call:
 
-internally, sochdb borrows three ideas from how biological memory works:
+```
+Agent → agidb.recall(cue) → result with provenance and confidence
+```
 
-1. **content-addressable storage.** memories are stored as high-dimensional binary signatures. retrieval is bit-overlap counting, not query parsing. you give the db a partial pattern; it returns the full pattern. this is how your hippocampus works.
+p95 latency: under 50ms. Per-query cost: zero (local CPU). Provenance: complete. Temporal grounding: bi-temporal by default. Goal awareness: recall is goal-biased. Belief revision: first-class with audit.
 
-2. **bi-temporal supersession.** new facts don't overwrite old ones. they get marked as the current version with `t_valid_start = now`, and the old fact gets `t_valid_end = now - 1` and `superseded_by = new_id`. you can query the db "as of" any historical date. this is how legal and financial systems track changing facts, and it's how human memory works — you remember that you used to live in Mumbai *and* that you live in Berlin now.
-
-3. **sleep-like consolidation.** a background worker periodically scans episodic signatures, bundles repeated patterns into semantic concepts, decays unused memory, and flags contradictions. this is what your hippocampus does during sleep — the McClelland-McNaughton-O'Reilly "complementary learning systems" model from cognitive neuroscience.
-
-## who sochdb is for
-
-**developers building AI agents** who currently use mem0, Letta, Zep, Cognee, LangMem, or a hand-rolled vector-db-plus-graph stack. sochdb gives them:
-- faster recall (sub-50ms p95 vs 200ms-3s)
-- lower cost (no embedding API calls in the read path, no token tax)
-- better grounding (bi-temporal + provenance)
-- simpler API (one function vs a pipeline)
-
-**developers building local-first / offline-first AI applications** — coding agents, desktop assistants, on-device personal AIs — who can't or won't depend on cloud services for memory. sochdb runs fully offline by default. zero network. zero API keys.
-
-**developers in regulated industries** — healthcare, legal, finance — who need auditable memory with full provenance and non-destructive updates. every claim in sochdb traces back to a verbatim source observation. contradictions are preserved, not silently overwritten.
-
-## who sochdb is not for
-
-- **applications that need a general-purpose database.** sochdb is a memory db for agents. it is not a transactional store for orders or users.
-- **applications that need full-text search over a document corpus.** use tantivy or elastic.
-- **applications doing pure similarity search over fixed embeddings.** use lancedb or qdrant. sochdb's signature is computed from extracted structure, not from a learned embedding.
-- **applications that need a hosted service today.** sochdb is embedded-first. a cloud tier is on the roadmap but not a v0.1 priority.
-
-## comparison to alternatives
+## Comparisons
 
 ### vs Mem0
 
-Mem0 is the velocity leader in agent memory (51,800 GitHub stars, $24M funded, used as the default memory layer in the AWS Agent SDK). it's a strong general-purpose choice. sochdb's differences:
-
-- **embedded vs hosted-first.** Mem0 is primarily a hosted SaaS with an open-source python sdk. sochdb is embedded, rust, single binary.
-- **no LLM in the read path.** Mem0 uses LLMs for extraction at write time and (optionally) at read time. sochdb uses LLMs only optionally at write time, never at read time.
-- **bi-temporal supersession.** Mem0 supports updates but not first-class historical querying.
-- **content-addressable retrieval.** Mem0 is hybrid vector + graph + key-value with rule-based extraction. sochdb uses hyperdimensional signatures as the unified primitive.
-
-### vs Zep / Graphiti
-
-Zep/Graphiti is the temporal-knowledge-graph leader (25,759 GitHub stars). it has bi-temporal grounding and runs against Neo4j or Kuzu. sochdb's differences:
-
-- **no external graph database.** Zep depends on Neo4j or Kuzu. sochdb is self-contained in one binary.
-- **content-addressable recall.** Zep uses Cypher-style traversals plus embeddings. sochdb uses HDC signatures.
-- **rust vs python.** Zep is python. sochdb is rust top to bottom.
+| dimension | mem0 | agidb |
+|---|---|---|
+| storage | vector DB + graph DB + KV cache | one Rust binary, redb + mmap |
+| retrieval | semantic similarity over embeddings | content-addressable HDC, bit-overlap counting |
+| dependencies | LLM API + embedding API + vector DB | none (LLM optional, write-time only) |
+| latency p95 | 1-3 seconds (API-dependent) | < 50ms (local) |
+| token cost | $0.001-0.01 per recall | $0 |
+| temporal grounding | flat timestamps, mutable | bi-temporal valid+tx, non-destructive supersession |
+| consolidation | none | surprise-gated background worker |
+| first-class goals | no | yes (state machines) |
+| first-class beliefs | no | yes (revisable with audit) |
+| unlearn API | DELETE | non-destructive cascading with audit |
+| self-model | no | append-only learning event log + self-vector EMA |
+| multimodal sensory | yes (LLM-extracted) | yes (V-JEPA 2 + Wav2Vec-BERT, factorable via VSA) [v2.1] |
+| brain-alignment | no | BAMS benchmark + brain-calibrated surprise [v2.1] |
+| embedded | no | yes |
+| funding | $24M total across Seed + Series A (Oct 2025) | bootstrap → seed at week 12 if gate passes |
+| stars (May 2026) | 41K | starting at 0, target 1000+ at v2.0 launch, 5000+ at v2.1 launch |
 
 ### vs Letta (formerly MemGPT)
 
-Letta is the OS-inspired memory leader ($10M Felicis seed, #1 on Terminal-Bench). it tiers memory like RAM/disk and lets the agent self-edit. sochdb's differences:
+| dimension | letta | agidb |
+|---|---|---|
+| paradigm | LLM-as-OS with memory tiers | brain-inspired substrate |
+| storage | core/recall/archival memory blocks in postgres | typed cognitive floors in redb + mmap |
+| retrieval | LLM-orchestrated memory paging | deterministic HDC + tiered fallback |
+| latency | model-bound (LLM in the loop) | sub-50ms (no LLM in read path) |
+| stateful agents | yes — that's their wedge | yes (as a side effect) |
+| first-class goals | tools + agent state | first-class typed state machines |
+| first-class beliefs | text in core memory | first-class revisable |
+| unlearn | edit core memory | non-destructive cascading + self-vector subtraction |
+| brain-alignment | no | yes [v2.1] |
+| embedded | requires server | yes |
+| funding | $10M seed (Sept 2024, Felicis lead) | bootstrap → seed |
+| stars (May 2026) | ~22K | starting at 0 |
 
-- **memory primitive vs full agent runtime.** Letta is an agent framework with memory built in. sochdb is just the memory layer — composable with any agent framework.
-- **embedded vs hosted.** Letta is primarily a cloud product.
-- **no self-editing.** Letta has the agent issue memory tool calls (memorize, remember). sochdb makes memory a database operation, not a tool call.
+Letta is a stateful agent runtime that happens to have memory. agidb is a memory substrate that any stateful agent runtime can sit on top of. They are complements, not direct competitors — but most teams will need to pick one for the day-1 build.
+
+### vs Zep / Graphiti
+
+| dimension | zep/graphiti | agidb |
+|---|---|---|
+| storage | temporal knowledge graph on Neo4j/Kuzu/FalkorDB | embedded, redb + mmap, no graph DB dependency |
+| temporal model | 4-timestamp bi-temporal edges | 4-timestamp bi-temporal columns on every fact |
+| retrieval | cypher-based + vector hybrid | content-addressable HDC, no query language |
+| LLM dependency | yes (extraction + retrieval) | extraction only (write-time), no LLM at read |
+| latency | LLM-bound at read | sub-50ms at read |
+| consolidation | rebuilds knowledge graph | surprise-gated semantic atom creation |
+| first-class goals/beliefs | no | yes |
+| unlearn | DELETE the graph node | non-destructive cascading + self-vector subtraction |
+| brain-alignment | no | yes [v2.1] |
+| embedded | no (requires graph DB) | yes |
+| stars (May 2026) | 25,759 | starting at 0 |
+
+Zep got the bi-temporal pattern right and ships it well. agidb shares that pattern but doesn't require a separate graph database — bi-temporal is a column on every row, the graph is implicit in the inverted index, and the cognitive primitives sit on top of the same substrate.
 
 ### vs Cognee
 
-Cognee ($7.5M seed led by Pebblebed, Feb 2026; 12K+ stars) does Extract-Cognify-Load over vector + graph. sochdb's differences:
+| dimension | cognee | agidb |
+|---|---|---|
+| target | ML-engineering teams | autonomous agents |
+| storage | pluggable backends (NetworkX/Neo4j/Kuzu/FalkorDB + vector) | single Rust binary, redb + mmap |
+| paradigm | knowledge-graph-first | cognitive-substrate-first |
+| LLM dependency | yes (multiple roles) | extraction only (write-time) |
+| first-class goals/beliefs | no | yes |
+| brain-alignment | no | yes [v2.1] |
+| funding | €7.5M seed (Feb 2026, Pebblebed lead) | bootstrap → seed |
+| rust engine | on roadmap | shipping |
+| stars (May 2026) | ~12K | starting at 0 |
 
-- **pure-rust vs python.** Cognee has a rust engine for edge devices on their roadmap but hasn't shipped it. sochdb is rust from day one.
-- **HDC signatures vs hybrid vector + graph.** different fundamental representation.
-- **single-binary embedded vs python + LanceDB + Kuzu.** simpler operational story.
+### vs MemMachine / MemOS / Hindsight
 
-### vs LangMem
+These are 2025/2026-vintage open-source memory systems achieving high scores on LongMemEval/LoCoMo. MemMachine reports 91.69% LoCoMo with gpt-4.1-mini, MemOS reports 35.24% token savings, Hindsight 20/20 91.4% LongMemEval. **All are Python frameworks operating above the LLM.** agidb is a Rust substrate operating beneath the agent loop. Different layer entirely.
 
-LangMem is the LangChain memory layer. it's slow — Mem0's published benchmarks show p95 search latency of 59.82 seconds, "rendering it impractical for interactive applications" (Chhikara et al., ECAI 2025). sochdb targets p95 under 50ms.
+### vs HippoRAG / HippoMM (the brain-inspired neighbors)
 
-## why now
+| dimension | hippoRAG | hippoMM | agidb |
+|---|---|---|---|
+| neural-symbolic | KG + PPR (personalized pagerank) | dentate gyrus + CA3 abstractions | HDC binding + signatures |
+| modality | text | audiovisual | text now, multimodal in v2.1 |
+| retrieval mechanism | graph traversal via PPR | pattern completion | tiered HDC cascade |
+| consolidation | none | dual-process | surprise-gated semantic atoms |
+| unlearn | none | none | first-class cascading |
+| performance claim | "10 to 30× cheaper, 6 to 13× faster than IRCoT" (NeurIPS 2024) | 78.2% HippoVlog, 5× faster than RAG | sub-50ms p95, 8× smaller than dense |
+| code | OSU-NLP-Group/HippoRAG | linyueqian/HippoMM | agidb/agidb |
+| substrate vs application | application on LLM | application on LLM | substrate beneath agent |
 
-three things changed between 2024 and 2026 that make sochdb a viable product:
+agidb's brain-alignment in v2.1 is more rigorous than hippoRAG/hippoMM — it doesn't just *claim* hippocampal inspiration, it benchmarks against TRIBE v2 cortical predictions via RSA.
 
-1. **agent memory became a category.** mem0, letta, cognee, zep all raised real funding in 2024-2026. the market knows it needs this.
-2. **HDC/VSA research matured for production use.** Torchhd shipped in 2023. PathHD demonstrated encoder-free HDC retrieval over knowledge graphs in December 2025. HPE's "Hippocampus" paper (Feb 2026) showed binary-signature retrieval beating vector databases by 31× latency and 14× token cost. the math is no longer experimental.
-3. **the embedded-db category got serious in rust.** duckdb, lancedb, redb, surrealdb, tigerbeetle all matured. an embedded memory db in rust is now a natural fit for the ecosystem.
+### vs OpenCog Hyperon (the AGI substrate from the academic world)
 
-## non-goals
+| dimension | hyperon | agidb |
+|---|---|---|
+| paradigm | metagraph + MeTTa language | cognitive substrate + Rust API |
+| AGI claim | explicit ("Baby Hyperon → adolescent → adult") | implicit (substrate, not full AGI) |
+| backing | SingularityNET / Goertzel | bootstrap, deep-tech VCs |
+| developer onramp | hard (MeTTa, AtomSpace, metagraph theory) | easy (cargo add, pip install) |
+| audience | academic | developers building production agents |
+| status | active research, no killer app | targeting benchmark-credible v2.0 at month 9 |
+| productization | low | high (this is the whole point) |
 
-sochdb is deliberately *not*:
+Hyperon is the closest intellectual neighbor and the only other open AGI substrate. They are deeper on theory, slower on productization, and target academic researchers. agidb targets developers building agents today, with theory backing the design but not gating the API.
 
-- a general-purpose database
-- a hosted cloud service (in v0.1)
-- a replacement for vector databases for RAG
-- a search engine over documents
-- a multimodal store (text first; images/audio deferred)
-- a distributed/sharded database (single-node only in v0.1)
-- a knowledge graph editor with a UI
+### vs Numenta thousand brains / Monty
 
-these may come later. they are not the v0.1 product.
+| dimension | monty | agidb |
+|---|---|---|
+| paradigm | sensorimotor learning, cortical columns, reference frames | HDC cognitive substrate |
+| language | python | rust |
+| target | sensorimotor robotics + embodied AI | agent memory + cognition |
+| code | thousandbrainsproject/tbp.monty | agidb/agidb |
+| funding | Gates Foundation | bootstrap |
+| brain-alignment claim | architectural (cortical columns) | empirical (BAMS RSA against TRIBE v2) [v2.1] |
 
-## what success looks like
+Complementary. Monty handles the perceptual front-end; agidb handles the persistent cognitive substrate.
 
-at the end of 6 months, sochdb should:
+### vs agentmemory (rohitg00) — the rust neighbor
 
-- match or beat Zep/Graphiti on LongMemEval-S (≥ 64 accuracy)
-- have ≥ 3× lower retrieval latency than Mem0 (target: p95 under 50ms)
-- have ≥ 3× lower token cost than Mem0 (target: under 2,500 tokens/query)
-- support 1M+ episodes on a laptop with sub-100ms p99 recall
-- be installable as `cargo add sochdb` and `pip install sochdb`
-- expose an MCP server so any MCP-compatible agent can use it as a tool
-- have full bi-temporal querying and a `consolidate()` API working end to end
-- have 500+ GitHub stars and 3+ design-partner deployments
+| dimension | agentmemory | agidb |
+|---|---|---|
+| language | rust | rust |
+| storage | RocksDB | redb + mmap |
+| retrieval | BM25 + HNSW hybrid | HDC tiered cascade |
+| interface | MCP server | embedded library + MCP server + CLI + pyo3 |
+| cognitive primitives | none | goals, beliefs, sensory, self-model |
+| temporal model | flat | bi-temporal supersession |
+| unlearn | DELETE | non-destructive cascading + self-vector subtraction |
+| brain-alignment | no | yes [v2.1] |
+| LoCoMo claim | 87.8% (self-reported) | TBD post-decision-gate |
 
-if these targets are met, sochdb is a real product worth raising a seed round on. if they aren't met, it's a learning that gets folded back into ctxgraph and the architecture moves on.
+Closest competitor on the language axis. But agentmemory is a memory *server*, not a *substrate*. Positioning: "agentmemory is a rust memory server; agidb is a rust cognitive substrate with first-class cognitive primitives, bi-temporal supersession, and brain-aligned multimodal sensory."
 
-see [ROADMAP.md](./roadmap.md) for the milestone plan.
+## Why now
+
+Five converging trends make May 2026 the right moment:
+
+**1. Agent memory became a category in 2024-2025.** Mem0 raised $24M total in October 2025 across two announced rounds (Seed led by Kindred Ventures, Series A led by Basis Set Ventures with Peak XV / GitHub Fund / Y Combinator). Letta raised $10M seed in September 2024 (Felicis lead, with Jeff Dean, Clem Delangue, Ion Stoica among angels). Zep, Cognee (€7.5M seed in Feb 2026 led by Pebblebed), Supermemory, Graphiti, MemoryOS, MemMachine all have funded teams and production users. The category exists; the cognitive-substrate wedge is empirically unoccupied.
+
+**2. HDC/VSA research matured for production.** Torchhd (JMLR 2023) is the canonical HDC library. Karunaratne et al. 2020 in Nature Electronics demonstrated in-memory HDC at scale. PathHD (December 2025) showed structured composition over hypervectors at scale. The math is settled; the productization gap is open.
+
+**3. The embedded-database renaissance is real in Rust.** redb (1.0 stable since June 2023) is the right default for embedded ACID storage. LanceDB, surrealdb, tigerbeetle all proved the embedded-rust pattern works in production. agidb fits the same niche: single binary, embedded-first, sqlite-grade ergonomics.
+
+**4. Frontier labs are not building externalizable substrates.** Anthropic's September 2025 memory tool is a CRUD interface over a `/memories` file directory — explicitly not a database. OpenAI's April 2025 ChatGPT memory upgrade is a product feature. Google's Personal Context in Gemini is a product feature. **No frontier lab is shipping a vendor-neutral substrate.** The wedge is open.
+
+**5. NEW: Brain-encoding foundation models matured in March 2026.** Meta FAIR released TRIBE v2 with open weights, predicting fMRI BOLD across 720 subjects from V-JEPA 2 + Wav2Vec-BERT + Llama-3.2-3B. This makes brain-aligned evaluation tractable for the first time. agidb v2.1 is built on the same encoder stack to inherit alignment. The brain-alignment benchmark (BAMS) is now a paper-sized contribution. **No other agent memory system can ship this because none of them are HDC-binding-first.**
+
+## What agidb is not claiming
+
+To be precise about what agidb is and isn't:
+
+- **agidb is not AGI.** It is the database AGI will run on top of. The model layer, the reasoning layer, the action layer — those are separate concerns. agidb provides the substrate; somebody else (probably a frontier lab) provides the cognition.
+- **agidb is not a research project.** It is production infrastructure. Every claim is reproducible; every API is shippable. The research happens in academic papers along the way; the product ships every week.
+- **agidb is not a complete cognitive architecture in v2.0.** v2.0 is the substrate. The cognitive engine extensions (pattern completion, analogical reasoning, belief revision with formal semantics) are v2.2+. v2.0 is the minimum credible cognitive substrate, not the complete one.
+- **agidb v2.1's brain-alignment is empirical, not aspirational.** We don't claim agidb "thinks like a brain." We claim agidb's internal representations align with TRIBE-predicted cortical activations on matched stimuli, measurable via RSA across six functional networks. That's a defensible empirical claim with a reproducible benchmark, not a marketing slogan.
+- **TRIBE v2 is not "alphafold for neuroscience".** Predicting BOLD (a hemodynamic proxy lagged ~5s behind neural activity) is not the same as predicting cognition itself. TRIBE achieves ~54% of the noise ceiling on out-of-distribution movies. That's a real result, not a discontinuous jump. agidb integrates TRIBE for evaluation purposes; we don't inherit its hype.
+
+## What success at month 9 looks like (v2.0)
+
+- agidb v2.0 launched publicly with arxiv whitepaper
+- Match/beat Zep/Graphiti on LongMemEval-S (≥ 64 accuracy)
+- ≥ 3× lower retrieval latency than Mem0 (p95 < 50ms)
+- ≥ 3× lower token cost than Mem0 (< 2,500 tokens/query)
+- All four cognitive benchmarks pass with documented thresholds
+- 1000+ GitHub stars in week 1
+- 5+ design-partner deployments
+- `cargo add agidb` + `pip install agidb` both work
+- MCP server in the official MCP registry
+
+## What success at month 12 looks like (v2.1)
+
+- v2.0 success criteria all hold
+- `agidb-sensory` ships with V-JEPA 2 + Wav2Vec-BERT + Llama-3.2-3B integration
+- Multimodal `observe_multimodal()` works on a laptop (≤ 2s for 30s video+audio clip)
+- Brain-calibrated surprise threshold released with reproducible calibration recipe against TRIBE v2
+- BAMS benchmark suite open-source with baseline scores (mem0, letta, zep, hippoRAG, raw V-JEPA latents)
+- agidb wins BAMS in associative-cortex networks (DMN, dorsal attention, frontoparietal)
+- ICLR 2026 MemAgents workshop paper accepted, or CCN 2026 oral presentation
+- 5000+ GitHub stars cumulative
+- 10+ design-partner deployments
+- Seed round closed ($1-3M from a deep-tech-friendly fund)
+
+## The 5-year vision
+
+agidb v2.0 (2026) is the substrate. v2.1 (2026) is brain-aligned multimodal sensory + the BAMS benchmark. v2.2-v2.5 is the path to AGI-grade: pattern completion as first-class operation, belief revision with formal semantics, analogical reasoning via HDC binding, causal claim storage, world model fragments, closed-loop self-modification, formal safety guarantees, production-grade enterprise tier. See [agi-trajectory.md](./agi-trajectory.md) for the full path.
+
+That 5-year vision is what justifies the AGIDB name. The 12-month v2.1 launch is what justifies the next step.

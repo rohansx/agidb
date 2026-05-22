@@ -1,6 +1,8 @@
-# Contributing to sochdb
+# Contributing to agidb
 
 > Before anything else, read [`.specify/memory/constitution.md`](./.specify/memory/constitution.md). Every Core Principle is binding; violations require an ADR amendment, not a workaround.
+>
+> **Naming:** the project is **agidb** (v2). The crates on disk are still named `sochdb-*` pending the pre-week-0 rename — see [ADR-0003](./docs/adr/0003-agidb-v2-constitution.md). The `cargo` commands and `crates/` paths below use the current `sochdb-*` names; substitute when the rename lands.
 
 ## Quick links
 
@@ -13,8 +15,8 @@
 ## Setup
 
 ```bash
-git clone https://github.com/sochdb/sochdb.git
-cd sochdb
+git clone https://github.com/agidb/agidb.git
+cd agidb
 cargo build --workspace          # builds all seven crates
 cargo test --workspace           # runs unit + property tests
 cargo clippy --workspace --all-targets -- -D warnings

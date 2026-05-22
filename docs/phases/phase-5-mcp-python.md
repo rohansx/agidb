@@ -1,6 +1,6 @@
 # phase 5 — MCP + python bindings
 
-**duration:** weeks 9-10
+**duration:** weeks 5-8
 **status:** not started
 **depends on:** [phase 4](./phase-4-binding-recall.md)
 
@@ -10,7 +10,7 @@ reach agents and python users. the engine works; now make it installable everywh
 
 ## deliverables
 
-- [ ] `sochdb-mcp/src/main.rs` MCP server exposing:
+- [ ] `agidb-mcp/src/main.rs` MCP server exposing:
   - `memory_observe`
   - `memory_recall`
   - `memory_what_about`
@@ -19,18 +19,18 @@ reach agents and python users. the engine works; now make it installable everywh
   - tool input schemas match [spec/tech-spec.md](../spec/tech-spec.md#the-mcp-server)
 - [ ] stdio transport (primary) and streamable-http transport (secondary)
 - [ ] claude desktop config example tested end-to-end
-- [ ] `sochdb-py/src/lib.rs` pyo3 bindings:
+- [ ] `agidb-py/src/lib.rs` pyo3 bindings:
   - async via `pyo3-asyncio`
   - all public types mapped (Recall, RecallMatch, Query, ObserveOpts, Provenance, Procedure)
   - errors translate to typed python exceptions
 - [ ] python wheels built for linux x86_64/aarch64, macOS x86_64/aarch64, windows x86_64
-- [ ] `pip install sochdb` published to PyPI test index
+- [ ] `pip install agidb` published to PyPI test index
 - [ ] basic usage examples in `examples/python/` and `examples/mcp/`
 
 ## exit criterion
 
-1. claude desktop can use sochdb as a memory tool via MCP — manual demo recorded
-2. `pip install sochdb` works on linux + macOS, smoke test passes
+1. claude desktop can use agidb as a memory tool via MCP — manual demo recorded
+2. `pip install agidb` works on linux + macOS, smoke test passes
 
 ## tasks
 

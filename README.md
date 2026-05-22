@@ -1,74 +1,103 @@
-# sochdb
+# agidb
 
-> sochdb is an embedded, content-addressable memory database for AI agents — storage and retrieval share the same hyperdimensional representation, bi-temporal by default, with automatic consolidation. one binary, one api, no query language.
+> **agidb is the cognitive substrate for autonomous AI agents — content-addressable hyperdimensional memory, first-class goals and beliefs, bi-temporal supersession, sleep-like consolidation, and a non-destructive unlearn primitive. One Rust binary, one API, no query language. The database AGI systems will run on top of.**
 
-[![Crates.io](https://img.shields.io/crates/v/sochdb.svg)](https://crates.io/crates/sochdb)
-[![Docs](https://docs.rs/sochdb/badge.svg)](https://docs.rs/sochdb)
+[![Crates.io](https://img.shields.io/crates/v/agidb.svg)](https://crates.io/crates/agidb)
+[![Docs](https://docs.rs/agidb/badge.svg)](https://docs.rs/agidb)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-## what is sochdb
+## what agidb is
 
-sochdb is a new category of database — a **content-addressable memory database** designed for AI agents that need to remember instead of query.
+agidb is a new category of database — a **cognitive substrate** designed for autonomous AI agents that need to *remember, reason, revise, and forget* across days, weeks, and years.
 
-most databases force you to write queries: SQL, Cypher, JSON paths, vector embeddings. sochdb doesn't. you give it observations in plain text, and you retrieve memories by partial cue. retrieval is one function call, runs in milliseconds on a laptop, makes zero network calls, and never returns "no results" — only matches with explicit confidence.
+most databases force you to write queries: SQL, Cypher, JSON paths, vector embeddings. agidb doesn't. you give it observations in plain text (or in v2.1+, raw video and audio), and it figures out the rest. retrieval is one function call, runs in milliseconds on a laptop, makes zero network calls in the read path, and never returns "no results" — only matches with explicit confidence scores.
+
+agidb stores the seven things an autonomous AI system needs to persist: sensory input, working memory, episodic memories, semantic facts, procedural skills, **first-class goals and beliefs**, and a self-model audit log. it is the first database where all seven are first-class types with their own retrieval semantics — not bolted on with schemas.
 
 ```rust
-let db = sochdb::open("./memory.soch").await?;
+let db = Agidb::open("./memory.agidb").await?;
 
-db.observe("Sarah recommended a thai place called Bawri in Bandra last weekend").await?;
+db.observe("Sarah recommended Bawri in Bandra last weekend").await?;
+db.assert_belief(Belief::new("Sarah likes thai food").with_confidence(0.8)).await?;
+db.set_goal(Goal::new("find a thai place for the team dinner")).await?;
 
 let result = db.recall("what thai place did sarah mention?").await?;
-// → Bawri, confidence 0.94, with provenance back to the original observation
+// → Bawri, confidence 0.94, with provenance back to the original observation,
+//   goal-biased because "find a thai place" is currently active.
 ```
 
 no SQL. no Cypher. no embedding API calls. no separate vector db. no rerank step. one function.
 
-sochdb integrates binding and recall without an external index — storage and retrieval share the same representation, so retrieval doesn't detour through a separate vector or graph lookup.
+## the lineage — agidb v2 succeeds sochdb v1
 
-## why sochdb exists
+agidb is the v2 successor to **sochdb**, the embedded memory database we shipped through phases 0-2, 4, and 6 (HDC kernel, bi-temporal storage, episode binding, tiered recall, consolidation). every line of sochdb's code carries forward. the HDC math is the same. the storage layout is the same. bi-temporal supersession is the same. **agidb is sochdb extended with the cognitive primitives an AGI substrate requires** — goals, beliefs, sensory buffering, self-model, neurosymbolic interface, and a first-class unlearn API.
 
-every existing database was designed for a different consumer:
+if you used sochdb v1, agidb v2 is a strict superset. no migrations required for the substrate features you already use.
 
-- **postgres / mysql** for accountants doing ledger transactions
-- **mongodb** for app developers managing semi-structured documents
-- **neo4j / graphiti** for analysts running ad-hoc graph traversals
-- **pinecone / qdrant / pgvector** for retrieval pipelines doing similarity search
+## why agidb exists
 
-none of them were designed for an autonomous AI agent that needs to remember things over months and years, with provenance, with temporal grounding, and with graceful degradation under uncertainty. agents using these databases pay a tax on every recall — embed the query, hit the vector db, fetch chunks, rerank, post-process, stuff into the prompt. six steps, multiple network calls, seconds of latency, dollars of token cost.
+today's agent memory pipeline is a six-step mess: embed every conversation → store vectors → embed the query → similarity search → rerank with another LLM call → stuff chunks into the prompt. it's slow (p95 1-3 seconds), expensive (API calls per query), has no temporal grounding, weak provenance, no graceful degradation, no consolidation, and certainly no first-class concept of *what the agent wants* or *what the agent believes*.
 
-sochdb collapses that pipeline into one local function call.
+an autonomous AI agent is not a search-over-documents application. it is a system that remembers, reasons, plans, learns, and forgets — and needs infrastructure shaped like that. agidb is shaped like that.
+
+agidb replaces the six-step pipeline with one local function call, and adds five primitives no other database has:
+
+1. **content-addressable storage via hyperdimensional signatures** — memories are 8192-bit binary fingerprints; retrieval is bit-overlap counting, not query parsing
+2. **bi-temporal supersession** — facts don't overwrite, they supersede; query "as of" any historical date
+3. **first-class goals and beliefs** — typed state machines for goals; revisable beliefs with audit trails
+4. **sleep-like consolidation** — surprise-gated background worker that compacts episodic patterns into semantic atoms, decays the unused, flags contradictions
+5. **non-destructive unlearn** — cascading removal with full audit trail; right-to-be-forgotten as a first-class operation
 
 ## key properties
 
-- **embedded.** one rust binary, runs locally, no server required. like sqlite, not like postgres.
+- **embedded.** one Rust binary, runs locally, no server required. like sqlite, not like postgres.
 - **content-addressable.** retrieval by partial cue, not by query. like remembering a song from humming three notes.
-- **bi-temporal by default.** every fact has valid-time (when it was true) and transaction-time (when we learned it). contradictions supersede rather than overwrite. you can always ask "what did we believe about X on date Y?"
-- **all five biological memory tiers.** episodic (events with time/place/people), semantic (consolidated facts), procedural (workflows and skills), working (session-scoped recall with recency boost). sensory memory is explicitly upstream. see [docs/product/biological-mapping.md](./docs/product/biological-mapping.md).
-- **no LLM in the read path.** recall is deterministic math over stored signatures. no API keys, no network calls, no hallucination at retrieval time.
-- **tiered confidence.** `recall()` never returns empty. it returns exact match → similarity match → gist → nearest neighbors, each with explicit confidence scores.
-- **automatic consolidation.** a background worker compacts repeated episodic patterns into semantic concepts, decays unused memory, flags contradictions. the db manages its own working set.
-- **full provenance.** every claim traces back to the verbatim observation that produced it. no opaque embeddings, no untraceable facts.
+- **bi-temporal by default.** every fact carries valid-time (when true) and transaction-time (when learned). contradictions supersede; nothing is overwritten silently.
+- **all seven cognitive tiers.** sensory, working, episodic, semantic, procedural, goals/beliefs, self-model. all first-class types.
+- **no LLM in the read path.** recall is deterministic math over stored signatures. zero API keys, zero network calls, zero hallucination at retrieval time. (LLMs may participate at write time for belief revision and consolidation, never at read.)
+- **tiered confidence.** `recall()` never returns empty. exact → similarity → gist → nearest-neighbor, each with explicit confidence scores.
+- **automatic consolidation.** surprise-gated background worker compacts repeated patterns, decays unused memory, flags contradictions, manages its own working set.
+- **non-destructive unlearn.** every fact is removable with a cascading audit log; nothing silently disappears.
+- **full provenance.** every claim traces back to the verbatim observation that produced it. every belief revision logs why. no opaque embeddings, no untraceable facts.
+- **introspectable.** the self-model log records every learning event; the agent can ask "what did I learn this week?"
+- **multimodal-ready (v2.1+).** V-JEPA 2 for video, Wav2Vec-BERT for audio, GLiNER for text — all extracted at write time, fused into one HDC episode signature via VSA binding.
 
 ## quickstart
 
 ```bash
-cargo add sochdb
+cargo add agidb
 ```
 
 ```rust
-use sochdb::{Sochdb, Query};
+use agidb::{Agidb, Query, Goal, Belief};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let db = Sochdb::open("./memory.soch").await?;
+    let db = Agidb::open("./memory.agidb").await?;
 
+    // floor 3 — episodic memory
     db.observe("Sarah told me about Letta's three-tier memory at PyCon", None).await?;
-    db.observe("Sarah's favourite thai place is Bawri in Bandra", None).await?;
 
+    // floor 6 — beliefs with confidence
+    db.assert_belief(
+        Belief::new("Letta uses OS-inspired memory tiering")
+            .with_confidence(0.9)
+            .with_evidence_from("Sarah's PyCon talk")
+    ).await?;
+
+    // floor 6 — goals with state machine
+    let goal = db.set_goal(
+        Goal::new("evaluate Letta vs agidb for next agent build")
+    ).await?;
+
+    // floor 1-7 — unified recall
     let recall = db.recall(Query::cue("what did sarah say about memory?")).await?;
     for r in recall.matches {
         println!("[{:.2}] {}", r.confidence, r.text);
     }
+
+    // floor 7 — introspection
+    let log = db.what_did_i_learn(since_yesterday()).await?;
 
     Ok(())
 }
@@ -76,28 +105,47 @@ async fn main() -> anyhow::Result<()> {
 
 ## the architecture in one paragraph
 
-sochdb is built in three layers. **layer 1** is the mind-like layer: every memory becomes an 8192-bit hyperdimensional signature, and retrieval is bit-overlap counting (POPCOUNT) over stored signatures. **layer 2** is the scaffolding: a local GLiNER ONNX model extracts entities and relations from observations so that signatures encode meaning, not phrasing — "Sarah recommended Bawri" and "Bawri was recommended by Sarah" produce the same signature. **layer 3** is the storage: redb for metadata and bi-temporal indexes, mmap'd flat files for signatures. the user only ever sees layer 1.
+agidb is built in three engineering layers that implement seven cognitive floors. **layer 1** is the mind-like layer: every memory becomes an 8192-bit hyperdimensional signature, and retrieval is bit-overlap counting (POPCOUNT) over stored signatures. **layer 2** is the scaffolding: GLiNER ONNX extracts entities and relations locally so signatures encode meaning rather than phrasing; from v2.1, V-JEPA 2 + Wav2Vec-BERT extend this to video and audio. **layer 3** is the storage: redb for metadata and bi-temporal indexes, mmap'd flat files for signatures, append-only logs for the self-model audit trail. these three engineering layers together implement the seven floors of an AGI substrate: sensory buffer, working memory, episodic memory, semantic memory, procedural memory, goals + beliefs, and the self-model. the user only ever sees the seven floors.
 
-See [docs/architecture/architecture.md](./docs/architecture/architecture.md) for the full picture.
+See [architecture.md](docs/architecture/architecture.md) for the full picture.
+
+## brain-alignment (v2.1+)
+
+agidb v2.1 introduces a **brain-aligned mode**: multimodal sensory encoding via Meta's V-JEPA 2 (video), Wav2Vec-BERT (audio), and Llama-3.2-3B (text) — the same encoder stack used by Meta FAIR's TRIBE v2 brain-encoding foundation model that won the Algonauts 2025 fMRI prediction competition.
+
+this matters for three reasons:
+
+1. **brain-calibrated surprise gating.** the threshold that promotes sensory frames to episodic memory can be empirically calibrated against neural surprise signals predicted by TRIBE v2 over 720-subject fMRI data. this gives agidb's sensory floor a measurement-grounded threshold instead of a magic number.
+2. **representational alignment with human cortex.** because agidb shares the encoder stack with TRIBE v2, its episode signatures can be directly compared against TRIBE-predicted cortical activations on matched stimuli via representational similarity analysis (RSA).
+3. **BAMS — the brain-aligned memory benchmark.** agidb v2.1 ships with BAMS, a new evaluation suite measuring agent memory systems against TRIBE-derived cortical ground truth across six functional networks (DMN, visual, auditory, language, dorsal attention, frontoparietal). first benchmark of its kind. published at ICLR 2026 MemAgents workshop.
+
+See [brain-alignment.md](docs/architecture/brain-alignment.md) and [bams-benchmark.md](docs/architecture/bams-benchmark.md).
 
 ## documentation
 
-full docs live in [`docs/`](./docs/README.md). entry points:
-
-- [docs/product/overview.md](./docs/product/overview.md) — product overview, who it's for, comparisons
-- [docs/architecture/architecture.md](./docs/architecture/architecture.md) — system architecture and data flow
-- [docs/product/biological-mapping.md](./docs/product/biological-mapping.md) — how sochdb maps to the five biological memory tiers
-- [docs/architecture/layer-1-recall.md](./docs/architecture/layer-1-recall.md) — the mind-like layer (HDC signatures, recall)
-- [docs/architecture/layer-2-extraction.md](./docs/architecture/layer-2-extraction.md) — the scaffolding (GLiNER, triples)
-- [docs/architecture/layer-3-storage.md](./docs/architecture/layer-3-storage.md) — the storage layer (redb, mmap)
-- [docs/spec/tech-spec.md](./docs/spec/tech-spec.md) — rust API, types, performance targets
-- [docs/spec/constitution.md](./docs/spec/constitution.md) — immutable project principles
-- [docs/product/roadmap.md](./docs/product/roadmap.md) — v0.1 → v1.0 milestones
-- [docs/phases/](./docs/phases/README.md) — per-phase build plan (phase 0 through phase 8)
+| doc | what's in it |
+|---|---|
+| [overview.md](docs/product/overview.md) | product overview, who it's for, comparisons, why now |
+| [PROJECT.md](docs/PROJECT.md) | the master reference, 12 sections, all phases |
+| [architecture.md](docs/architecture/architecture.md) | the three engineering layers + seven floors, data flow, design choices |
+| [biological-mapping.md](docs/product/biological-mapping.md) | the seven floors mapped to cognitive psychology |
+| [layer-1-recall.md](docs/architecture/layer-1-recall.md) | HDC signatures, binding, bundling, tiered retrieval, goal-biased recall |
+| [layer-2-extraction.md](docs/architecture/layer-2-extraction.md) | GLiNER, V-JEPA 2, Wav2Vec-BERT, triples, belief extraction |
+| [layer-3-storage.md](docs/architecture/layer-3-storage.md) | redb schema, mmap signatures, bi-temporal model, on-disk layout |
+| [cognitive-primitives.md](docs/architecture/cognitive-primitives.md) | goals, beliefs, sensory buffer, self-model, unlearn API |
+| [neurosymbolic.md](docs/architecture/neurosymbolic.md) | the bidirectional interface between signatures and structured beliefs |
+| [brain-alignment.md](docs/architecture/brain-alignment.md) | **new in v2** — V-JEPA 2 + TRIBE v2 integration, brain-calibrated surprise gating |
+| [bams-benchmark.md](docs/architecture/bams-benchmark.md) | **new in v2** — the brain-aligned memory similarity benchmark, paper plan |
+| [tech-spec.md](docs/spec/tech-spec.md) | the full Rust API, types, trait, performance targets |
+| [agi-trajectory.md](docs/product/agi-trajectory.md) | the 5-year roadmap from v2.0 substrate to v2.5 AGI-grade |
+| [roadmap.md](docs/product/roadmap.md) | the near-term phase plan, weeks 1-52 (extended through BAMS at month 12) |
+| [CONSTITUTION.md](docs/spec/constitution.md) | the immutable principles governing every decision |
 
 ## status
 
-sochdb is pre-alpha. v0.1 targets a 6-month build to a benchmark-credible release against Mem0, Zep/Graphiti, and Letta on LongMemEval-S, LoCoMo, and BEAM. see [docs/product/roadmap.md](./docs/product/roadmap.md) for the full plan.
+agidb v2.0 is pre-alpha. inherits sochdb v1's working HDC kernel, storage, binding, recall, and consolidation. the AGI pivot adds five new phases (phases 9-13): cognitive primitives, sensory buffer, self-model, unlearn API, and neurosymbolic interface. target benchmark-credible substrate release at month 9.
+
+**agidb v2.1** extends the substrate with multimodal sensory encoding (V-JEPA 2 + Wav2Vec-BERT + GLiNER), brain-calibrated surprise gating, and the BAMS benchmark suite. target month 12 (aug 2026). paper submission to ICLR 2026 MemAgents workshop.
 
 ## license
 

@@ -1,7 +1,7 @@
 # phase 6 — consolidation
 
-**duration:** weeks 11-12
-**status:** not started
+**duration:** weeks — (inherited from sochdb v1)
+**status:** complete (inherited from sochdb v1)
 **depends on:** [phase 4](./phase-4-binding-recall.md) (phase 5 can run in parallel)
 
 ## goal
@@ -10,16 +10,16 @@ land the analog of sleep: a background tokio task that clusters episodes, create
 
 ## deliverables
 
-- [ ] `sochdb-core/src/consolidate.rs` with five steps:
+- [x] `agidb-core/src/consolidate.rs` with five steps:
   1. **cluster** — scan recent episodic signatures (last 7 days), cluster by hamming distance
   2. **semantic atom creation** — clusters with N ≥ 3 episodes bundle into semantic atoms with evidence_count + provenance back to source episodes
   3. **contradiction detection** — same (subject, predicate), overlapping valid time, different object → newer fact gets `t_valid_start=now`, older gets `t_valid_end=now-1ms` and `superseded_by`
   4. **decay** — unreferenced atoms (no recall hits in 90 days) decay by factor λ; archive below floor
   5. **compact** — rewrite signatures.dat to remove archived entries; update offsets
-- [ ] consolidation log + audit trail in `consolidation_log` redb table
-- [ ] `Sochdb::consolidate()` synchronous API returning `ConsolidationReport`
-- [ ] background task scheduler (default: every 5 minutes when idle)
-- [ ] 10k-episode synthetic dataset with known redundancy patterns
+- [x] consolidation log + audit trail in `consolidation_log` redb table
+- [x] `Agidb::consolidate()` synchronous API returning `ConsolidationReport`
+- [x] background task scheduler (default: every 5 minutes when idle)
+- [x] 10k-episode synthetic dataset with known redundancy patterns
 
 ## exit criterion
 

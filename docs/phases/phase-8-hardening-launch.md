@@ -1,6 +1,6 @@
 # phase 8 — hardening + launch
 
-**duration:** weeks 13-26
+**duration:** weeks 31-36
 **status:** not started
 **depends on:** [phase 7](./phase-7-decision-gate.md) (commit threshold met)
 
@@ -26,18 +26,18 @@ this phase only runs if phase 7's commit threshold was met. if reposition, see t
 - [ ] arxiv whitepaper, target 12-15 pages
   - venue: NeurIPS workshop or ICLR system track
   - audience: ML researchers + systems engineers
-  - sections: problem framing, HDC primer, sochdb architecture, evaluation, limitations
-- [ ] launch blog post on sochdb.dev
+  - sections: problem framing, HDC primer, agidb architecture, evaluation, limitations
+- [ ] launch blog post on agidb.dev
 - [ ] one-pager PDF for investor conversations
 - [ ] 60-second demo video (terminal recording + voiceover)
 
 ### distribution
 
-- [ ] crates.io publish of `sochdb`, `sochdb-core`, `sochdb-extract`, `sochdb-mcp`
-- [ ] PyPI publish of `sochdb` (wheel matrix)
+- [ ] crates.io publish of `agidb`, `agidb-core`, `agidb-extract`, `agidb-mcp`
+- [ ] PyPI publish of `agidb` (wheel matrix)
 - [ ] MCP registry submission
-- [ ] `cargo binstall sochdb` smoke test (single-binary install path)
-- [ ] homebrew formula for `sochdb-mcp` (later if time)
+- [ ] `cargo binstall agidb` smoke test (single-binary install path)
+- [ ] homebrew formula for `agidb-mcp` (later if time)
 
 ### design partners
 
