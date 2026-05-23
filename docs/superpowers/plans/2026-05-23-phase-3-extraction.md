@@ -12,6 +12,33 @@
 
 **Port source:** `/home/rsx/Desktop/projx/ctxgraph/crates/ctxgraph-extract/`
 
+## Execution status (2026-05-23)
+
+10 of 18 tasks complete. Workspace at HEAD: 81 tests passing (+37 over baseline), clippy + fmt clean.
+
+| Task | Status | Commit |
+|---|---|---|
+| 1 — agidb-core types | ✅ | `bd55104` |
+| 2 — deps + ExtractError | ✅ | `883e60a` |
+| 3 — predicate canonicalizer | ✅ | `5a48192` |
+| 4 — `Store::create_concept` | ✅ | `d059ec8` |
+| 5 — alias resolver | ✅ | `c4bd7db` |
+| 6 — temporal parser | ✅ | `7805699` |
+| 7 — ModelRef constants | ✅ | `9ff4604` |
+| 8 — model_manager | ✅ | `a628f9f` |
+| `Store::next_episode_id` (plan-adjacent helper) | ✅ | `755d998` |
+| 9 — NER via gline-rs | ⬜ | needs `gline-rs` API + ONNX download |
+| 10 — GLiREL port | ⬜ | needs ctxgraph port + ONNX |
+| 11 — `Extractor` orchestration | ⬜ | depends on 9 + 10; TextExtractor trait already in place |
+| 12 + 13 — `observe_text` + integration test | ✅ | `15846ef` (does NOT depend on 11 thanks to TextExtractor trait + MockExtractor) |
+| 14 — eval sub-crate scaffold | ⬜ | depends on 11 |
+| 15 — 100-sample gold dataset | ⬜ | **human labelling work** |
+| 16 — eval binary | ⬜ | depends on 11 + 15 |
+| 17 — nightly CI workflow | ⬜ | depends on 14–16 |
+| 18 — F1 ≥ 0.85 verification loop | ⬜ | the actual exit gate |
+
+See [`../specs/2026-05-23-phase-3-extraction-design.md`](../specs/2026-05-23-phase-3-extraction-design.md) § 14 for as-built type adjustments. See [`../../phases/phase-3-extraction.md`](../../phases/phase-3-extraction.md) for the per-deliverable view.
+
 ---
 
 ## File Structure

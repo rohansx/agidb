@@ -302,7 +302,46 @@ The phase exits **only** when all of:
 | ctxgraph port introduces subtle bugs vs original | port one file at a time with its tests; run ctxgraph's existing tests against the ported version where possible |
 | `gline-rs` upstream API churn | pin exact version in workspace deps; track in `Cargo.lock` |
 
-## 14 — References
+## 14 — As-built adjustments (logged 2026-05-23 during execution)
+
+The design above was written against the agidb v2 **tech-spec** types. The
+actually-implemented v1 types in `agidb-core` are simpler than the spec
+assumed. The plan was adjusted inline during execution; recording the
+deltas here so the spec remains an honest record:
+
+- **`Triple` is simpler than the spec.** The v1 `Triple` has
+  `subject: String`, `object: String`, `episode_id: EpisodeId` (no `Value`
+  enum, no `Option<EpisodeId>`). Phase 3 introduced **`ExtractedTriple`**
+  in `agidb-core::types` as the layer-2-facing shape (no `episode_id`);
+  `observe_text` promotes `ExtractedTriple` to `Triple` once it mints an
+  `EpisodeId`.
+- **`Entity` uses `canonical_name: Option<String>`** instead of
+  `concept_id: Option<ConceptId>` — keeps everything string-based to
+  match the existing `Triple.subject`/`object` shape.
+- **`Concept` lacks `signature` / `created_at` / `withdrawn_at`** and uses
+  `entity_type` (not `concept_type`). `Store::create_concept` writes only
+  the fields that actually exist.
+- **`Episode` uses `signature_offset: u64`**, not `signature: HV`. The
+  caller passes `signature_offset: 0`; `Store::observe` overwrites it
+  with the real mmap offset after appending the HV to `signatures.dat`.
+- **No `next_episode_id` counter existed in phase-2 storage.** Phase 3
+  added `Store::next_episode_id` (analogous to `next_concept_id`), along
+  with the `KEY_NEXT_EPISODE_ID` manifest key.
+- **No `SessionId` type exists.** `Provenance.session_id` is
+  `Option<String>` in the v1 schema; `ObserveContext` accordingly carries
+  only `observation_time` + `provenance`, not a separate session id.
+- **`chrono_english` 0.1.8 doesn't parse English number-words** ("two
+  months ago"). Added a small word-to-digit normalizer in
+  `temporal.rs::normalize_number_words` so NER-produced word forms reach
+  the parser as digits.
+- **`StoreConfig` field is `root`**, not `path`; constructed with
+  `StoreConfig::at(path)`, not struct literal with a `Default` (there is
+  none).
+
+These adjustments preserve every behavioral decision in §§ 1–13. Only
+the concrete type names / field names changed.
+
+## 15 — References
 
 - [`docs/phases/phase-3-extraction.md`](../../phases/phase-3-extraction.md) — the phase brief (this design implements it)
 - [`docs/architecture/layer-2-extraction.md`](../../architecture/layer-2-extraction.md) — layer-2 architecture

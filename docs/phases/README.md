@@ -9,7 +9,7 @@
 | 0 | [setup](./phase-0-setup.md) | — | ✅ complete (inherited from sochdb v1) |
 | 1 | [HDC kernel](./phase-1-hdc-kernel.md) | — | ✅ complete (inherited) |
 | 2 | [storage](./phase-2-storage.md) | — | ✅ complete (inherited) |
-| 3 | [extraction (GLiNER)](./phase-3-extraction.md) | 1-4 | ⬜ not started — v2.0 critical |
+| 3 | [extraction (GLiNER)](./phase-3-extraction.md) | 1-4 | 🟨 in progress — substrate done; models + gold-set pending |
 | 4 | [binding + recall](./phase-4-binding-recall.md) | — | ✅ complete (inherited) |
 | 5 | [MCP + Python](./phase-5-mcp-python.md) | 5-8 | ⬜ not started — v2.0 critical |
 | 6 | [consolidation](./phase-6-consolidation.md) | — | ✅ complete (inherited) |
@@ -32,7 +32,7 @@ a phase exits only when its exit criterion is met **on a reproducible benchmark*
 
 phases 0, 1, 2, 4, and 6 are complete — inherited from sochdb v1 and verified by 44 passing tests.
 
-phases 3, 5, and 7–16 are not started.
+phase 3 is **in progress** — the model-free substrate is built (10 of 18 plan tasks, 81 workspace tests green); the NER + GLiREL wrappers and the 100-sample gold set are deferred to a model-access session. See [`phase-3-extraction.md`](./phase-3-extraction.md) for the per-deliverable status. phases 5 and 7–16 are not started.
 
 weeks 9-10 are a benchmark-harness build that is phase-7 prep, not a separate phase.
 
