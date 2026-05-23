@@ -11,11 +11,11 @@
 //! `docs/superpowers/specs/2026-05-23-phase-3-extraction-design.md`.
 
 pub mod error;
+pub mod predicates;
 
 // The modules below are introduced by later plan tasks. Each task
 // uncomments its module declaration as it lands.
 //
-// pub mod predicates;     — plan task 3
 // pub mod aliases;        — plan task 5
 // pub mod temporal;       — plan task 6
 // pub mod models;         — plan task 7
