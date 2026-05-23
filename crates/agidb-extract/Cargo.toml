@@ -18,4 +18,24 @@ anyhow = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 chrono = { workspace = true }
+# extraction-specific (model-free; gline-rs / ort / tokenizers / ndarray
+# arrive in plan task 9 when ner.rs actually needs them)
+chrono-english = { workspace = true }
+reqwest = { workspace = true }
+sha2 = { workspace = true }
+dirs = { workspace = true }
+regex = { workspace = true }
+indicatif = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+tempfile = { workspace = true }
+
+[features]
+default = []
+# Tests gated by this feature run real ONNX inference + may download
+# model weights. Per-PR CI runs without it; nightly eval workflow turns
+# it on.
+model-tests = []
