@@ -12,6 +12,7 @@
 
 pub mod aliases;
 pub mod error;
+pub mod model_manager;
 pub mod models;
 pub mod predicates;
 pub mod temporal;
@@ -19,7 +20,6 @@ pub mod temporal;
 // The modules below are introduced by later plan tasks. Each task
 // uncomments its module declaration as it lands.
 //
-// pub mod model_manager;  — plan task 8
 // pub mod ner;            — plan task 9
 // pub mod glirel;         — plan task 10
 // pub mod extractor;      — plan task 11
