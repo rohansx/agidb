@@ -109,9 +109,11 @@ dependencies = [
  "agidb-core",
  "agidb-extract",
  "anyhow",
+ "chrono",
  "serde",
  "serde_json",
- "tokio",
+ "tempfile",
+ "thiserror 1.0.69",
  "tracing",
  "tracing-subscriber",
 ]

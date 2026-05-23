@@ -1,11 +1,28 @@
-//! agidb MCP server — exposes memory_observe, memory_recall, memory_what_about,
-//! memory_between, memory_consolidate as MCP tools.
+//! agidb-mcp binary entrypoint.
 //!
-//! Phase 5 lands the full server. This stub exists so the workspace compiles.
+//! Usage:
+//!   agidb-mcp <db_path>
+//!
+//! Opens or creates a store at `<db_path>`, attempts to load the layer-2
+//! Extractor (falls back to `NullExtractor` if the model cache is cold),
+//! and runs the JSON-RPC server over stdio. Clients (Claude Desktop,
+//! Cursor, etc.) drive it via the MCP `tools/call` mechanism.
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
-    eprintln!("agidb-mcp — pre-alpha. See docs/phases/phase-5-mcp-python.md.");
-    Ok(())
+use agidb_mcp::{AgidbContext, McpServer};
+use anyhow::Result;
+
+fn main() -> Result<()> {
+    // Logs go to stderr; stdout is reserved for JSON-RPC frames.
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .init();
+
+    let db_path = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "./agidb-data".to_string());
+    tracing::info!(db_path = %db_path, "starting agidb-mcp");
+
+    let ctx = AgidbContext::open(&db_path)?;
+    let server = McpServer::new(ctx);
+    server.run_stdio()
 }
