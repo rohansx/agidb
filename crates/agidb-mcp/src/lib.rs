@@ -7,11 +7,10 @@
 //! `docs/phases/phase-5-mcp-python.md`.
 //!
 //! Layout:
-//!   - [`protocol`] — JSON-RPC + MCP message types (parsing, errors).
-//!   - [`context`]  — `AgidbContext`: Store + Extractor wrapper, the
-//!                    surface tools dispatch through.
-//!   - [`tools`]    — tool registry + per-tool schema + handler.
-//!   - [`server`]   — `McpServer`: pure `handle_request` + stdio driver.
+//! - [`protocol`] — JSON-RPC + MCP message types (parsing, errors).
+//! - [`context`] — `AgidbContext`: Store + Extractor wrapper, the surface tools dispatch through.
+//! - [`tools`] — tool registry + per-tool schema + handler.
+//! - [`server`] — `McpServer`: pure `handle_request` + stdio driver.
 
 pub mod context;
 pub mod protocol;
