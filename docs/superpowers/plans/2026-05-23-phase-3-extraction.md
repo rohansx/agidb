@@ -18,23 +18,23 @@
 
 | Task | Status | Commit |
 |---|---|---|
-| 1 — agidb-core types | ✅ | `bd55104` |
-| 2 — deps + ExtractError | ✅ | `883e60a` |
-| 3 — predicate canonicalizer | ✅ | `5a48192` |
-| 4 — `Store::create_concept` | ✅ | `d059ec8` |
-| 5 — alias resolver | ✅ | `c4bd7db` |
-| 6 — temporal parser | ✅ | `7805699` |
-| 7 — ModelRef constants | ✅ | `9ff4604` |
-| 8 — model_manager | ✅ | `a628f9f` |
-| `Store::next_episode_id` (plan-adjacent helper) | ✅ | `755d998` |
-| 9 — NER via gline-rs | ✅ | `d5fd6e3` |
-| 10 — ONNX relation extractor | ⬜ | deferred to phase-3 v2 — port `glirel.rs` (DeBERTa, 717 LOC) or `relex.rs` (gliner-relex, 501 LOC). v1 heuristic ships in `d5fd6e3`. |
-| 11 — `Extractor` orchestration | 🟨 v1 done; v2 swaps the relation extractor | `d5fd6e3` |
-| 12 + 13 — `observe_text` + integration test | ✅ | `15846ef` |
-| 14 — eval sub-crate scaffold | ✅ | `0535e89` |
-| 15 — 100-sample gold dataset | ⬜ | **human labelling work** — 3-entry placeholder committed in `0535e89` |
-| 16 — eval scoring (P/R/F1, exit-2 if < 0.85) | ✅ | `0535e89` |
-| 17 — nightly CI workflow | ✅ | `0535e89` |
+| 1 — agidb-core types | ✅ | `5f86f85` |
+| 2 — deps + ExtractError | ✅ | `b0c1057` |
+| 3 — predicate canonicalizer | ✅ | `87a5742` |
+| 4 — `Store::create_concept` | ✅ | `6591d60` |
+| 5 — alias resolver | ✅ | `963a368` |
+| 6 — temporal parser | ✅ | `88cee98` |
+| 7 — ModelRef constants | ✅ | `a672853` |
+| 8 — model_manager | ✅ | `ce49602` |
+| `Store::next_episode_id` (plan-adjacent helper) | ✅ | `50c4b83` |
+| 9 — NER via gline-rs | ✅ | `5c517df` |
+| 10 — ONNX relation extractor | ⬜ | deferred to phase-3 v2 — port `glirel.rs` (DeBERTa, 717 LOC) or `relex.rs` (gliner-relex, 501 LOC). v1 heuristic ships in `5c517df`. |
+| 11 — `Extractor` orchestration | 🟨 v1 done; v2 swaps the relation extractor | `5c517df` |
+| 12 + 13 — `observe_text` + integration test | ✅ | `d1da768` |
+| 14 — eval sub-crate scaffold | ✅ | `0f306f0` |
+| 15 — 100-sample gold dataset | ⬜ | **human labelling work** — 3-entry placeholder committed in `0f306f0` |
+| 16 — eval scoring (P/R/F1, exit-2 if < 0.85) | ✅ | `0f306f0` |
+| 17 — nightly CI workflow | ✅ | `0f306f0` |
 | 18 — F1 ≥ 0.85 verification loop | 🟨 gate baked into the eval binary; iteration loop awaits (10) + (15) |
 
 See [`../specs/2026-05-23-phase-3-extraction-design.md`](../specs/2026-05-23-phase-3-extraction-design.md) § 14 for as-built type adjustments. See [`../../phases/phase-3-extraction.md`](../../phases/phase-3-extraction.md) for the per-deliverable view.
