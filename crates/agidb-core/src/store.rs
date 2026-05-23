@@ -381,6 +381,45 @@ impl Store {
         Ok(count)
     }
 
+    /// Case-insensitive lookup against `CONCEPT_BY_NAME`. O(N); fine for
+    /// the v0.1 concept-count regime. Returns the first row whose
+    /// lowercased canonical name matches `lowercased`.
+    pub fn concept_id_for_ci(&self, lowercased: &str) -> Result<Option<ConceptId>> {
+        let tx = self.db.begin_read()?;
+        let table = tx.open_table(CONCEPT_BY_NAME)?;
+        for row in table.iter()? {
+            let (k, v) = row?;
+            if k.value().to_lowercase() == lowercased {
+                return Ok(Some(ConceptId::new(v.value())));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Return every ConceptId whose lowercased canonical name is within
+    /// Levenshtein distance `max_dist` of `lowercased`. Skips the exact
+    /// match — use [`concept_id_for_ci`] for that. O(N).
+    pub fn fuzzy_concept_candidates(
+        &self,
+        lowercased: &str,
+        max_dist: usize,
+    ) -> Result<Vec<ConceptId>> {
+        let tx = self.db.begin_read()?;
+        let table = tx.open_table(CONCEPT_BY_NAME)?;
+        let mut hits = Vec::new();
+        for row in table.iter()? {
+            let (k, v) = row?;
+            let folded = k.value().to_lowercase();
+            if folded == lowercased {
+                continue;
+            }
+            if levenshtein(&folded, lowercased) <= max_dist {
+                hits.push(ConceptId::new(v.value()));
+            }
+        }
+        Ok(hits)
+    }
+
     /// Idempotent on canonical name: if a Concept with this name already
     /// exists, return its `ConceptId` unchanged. Otherwise mint a new id,
     /// persist a Concept row with `entity_type` set, and return it.
@@ -433,6 +472,37 @@ fn encode<T: serde::Serialize>(value: &T) -> Result<Vec<u8>> {
 
 fn decode<T: for<'de> serde::Deserialize<'de>>(bytes: &[u8]) -> Result<T> {
     bincode::deserialize(bytes).map_err(|e| AgidbError::Internal(format!("bincode decode: {e}")))
+}
+
+/// Iterative Levenshtein distance (two-row variant). Used by
+/// [`Store::fuzzy_concept_candidates`]; duplicated in
+/// `agidb-extract::aliases` only to keep agidb-core extraction-blind in
+/// the rare case a future caller needs the helper standalone.
+fn levenshtein(a: &str, b: &str) -> usize {
+    let (m, n) = (a.chars().count(), b.chars().count());
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr = vec![0usize; n + 1];
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                0
+            } else {
+                1
+            };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
 }
 
 /// Read-modify-write the monotonic concept-id counter inside the
