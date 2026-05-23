@@ -28,6 +28,11 @@ sha2 = { workspace = true }
 dirs = { workspace = true }
 regex = { workspace = true }
 indicatif = { workspace = true }
+# NER (plan task 9)
+gline-rs = { workspace = true }
+ort = { workspace = true }
+tokenizers = { workspace = true }
+orp = "0.9"
 
 [dev-dependencies]
 proptest = { workspace = true }

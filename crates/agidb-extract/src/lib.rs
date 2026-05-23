@@ -12,13 +12,17 @@
 
 pub mod aliases;
 pub mod error;
+pub mod extractor;
+pub mod heuristic_relations;
 pub mod model_manager;
 pub mod models;
+pub mod ner;
 pub mod predicates;
 pub mod temporal;
 
-// The modules below are introduced by later plan tasks. Each task
-// uncomments its module declaration as it lands.
+pub use crate::extractor::{Extractor, ExtractorConfig};
+
+// Remaining future modules:
 //
 // pub mod ner;            — plan task 9
 // pub mod glirel;         — plan task 10

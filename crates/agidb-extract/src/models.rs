@@ -15,14 +15,23 @@ pub struct ModelRef {
     pub file: Option<&'static str>,
 }
 
-/// Default GLiNER model for NER. The SHA gets pinned the first time
-/// `model_manager` successfully downloads + verifies the artifact (plan
-/// task 9).
+/// Default GLiNER model for NER (the .onnx file). The SHA gets pinned
+/// the first time `model_manager` successfully downloads + verifies the
+/// artifact.
 pub const GLINER_DEFAULT: ModelRef = ModelRef {
-    repo: "urchade/gliner_multi-v2.1",
+    repo: "onnx-community/gliner_large-v2.1",
     revision: "main",
     sha256: "TBD-PIN-AT-FIRST-DOWNLOAD",
-    file: Some("model.onnx"),
+    file: Some("onnx/model.onnx"),
+};
+
+/// Default GLiNER tokenizer (tokenizer.json — `gliner`/`orp` load this
+/// separately from the ONNX file).
+pub const GLINER_TOKENIZER_DEFAULT: ModelRef = ModelRef {
+    repo: "onnx-community/gliner_large-v2.1",
+    revision: "main",
+    sha256: "TBD-PIN-AT-FIRST-DOWNLOAD",
+    file: Some("tokenizer.json"),
 };
 
 /// Default GLiREL model for relation extraction. The repo candidate

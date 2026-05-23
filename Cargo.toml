@@ -55,6 +55,12 @@ dirs = "6"
 regex = "1"
 indicatif = "0.17"
 
+# extraction (phase 3, plan task 9) — NER ML deps. Pinned to match ctxgraph
+# so the eventual relation-extraction port has no version-conflict surprise.
+gline-rs = "1"
+ort = "=2.0.0-rc.9"
+tokenizers = "0.22"
+
 [profile.release]
 codegen-units = 1
 lto = "thin"
