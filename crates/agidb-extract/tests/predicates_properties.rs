@@ -55,3 +55,23 @@ fn case_insensitive_lookup() {
     assert_eq!(canonicalize(&t, "RECOMMENDED"), Some("recommends".into()));
     assert_eq!(canonicalize(&t, "Works At"), Some("works_at".into()));
 }
+
+#[test]
+fn expanded_vocabulary_v1() {
+    let t = table();
+    // A sampling across the v1 polish additions; full table in predicates.rs.
+    assert_eq!(canonicalize(&t, "chose"), Some("chose".into()));
+    assert_eq!(canonicalize(&t, "selected"), Some("chose".into()));
+    assert_eq!(canonicalize(&t, "opted for"), Some("chose".into()));
+    assert_eq!(canonicalize(&t, "avoided"), Some("avoided".into()));
+    assert_eq!(canonicalize(&t, "introduced"), Some("introduced".into()));
+    assert_eq!(canonicalize(&t, "arrived at"), Some("arrived_at".into()));
+    assert_eq!(canonicalize(&t, "wrote"), Some("wrote".into()));
+    assert_eq!(canonicalize(&t, "discussed"), Some("discussed".into()));
+    assert_eq!(canonicalize(&t, "bought"), Some("bought".into()));
+    assert_eq!(canonicalize(&t, "founded"), Some("founded".into()));
+    assert_eq!(canonicalize(&t, "knows"), Some("knows".into()));
+    assert_eq!(canonicalize(&t, "married"), Some("married".into()));
+    assert_eq!(canonicalize(&t, "hired"), Some("hired".into()));
+    assert_eq!(canonicalize(&t, "thanked"), Some("thanked".into()));
+}

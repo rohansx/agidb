@@ -90,3 +90,65 @@ fn handles_entities_with_no_text_between() {
     let triples = extract_heuristic_relations(text, &ents, &t);
     assert!(triples.is_empty(), "no text between → no triple");
 }
+
+#[test]
+fn sentence_boundary_blocks_relation() {
+    let t = PredicateTable::default();
+    // Two independent sentences; the pair (Bob, Alice) sits across the
+    // boundary and must not produce a triple.
+    let text = "Sarah likes Bob. Alice met Carol";
+    let ents = vec![
+        entity("Sarah", "Person", (0, 5)),
+        entity("Bob", "Person", (12, 15)),
+        entity("Alice", "Person", (17, 22)),
+        entity("Carol", "Person", (27, 32)),
+    ];
+    let triples = extract_heuristic_relations(text, &ents, &t);
+    let preds: Vec<&str> = triples.iter().map(|t| t.predicate.as_str()).collect();
+    assert_eq!(triples.len(), 2, "got {triples:?}");
+    assert!(preds.contains(&"likes"));
+    assert!(preds.contains(&"met"));
+    // Cross-sentence pair must not appear in any form.
+    assert!(
+        !triples
+            .iter()
+            .any(|t| (t.subject == "Bob" && t.object == "Alice")
+                || (t.subject == "Alice" && t.object == "Bob")),
+        "cross-sentence relation leaked: {triples:?}"
+    );
+}
+
+#[test]
+fn length_cap_prevents_distant_relations() {
+    let t = PredicateTable::default();
+    // 11 words sit between Sarah and Bawri — exceeds MAX_BETWEEN_WORDS.
+    let text = "Sarah walked through the busy market on a sunny afternoon and recommended Bawri";
+    let s_start = text.find("Sarah").unwrap();
+    let b_start = text.find("Bawri").unwrap();
+    let ents = vec![
+        entity("Sarah", "Person", (s_start, s_start + 5)),
+        entity("Bawri", "Place", (b_start, b_start + 5)),
+    ];
+    let triples = extract_heuristic_relations(text, &ents, &t);
+    assert!(
+        triples.is_empty(),
+        "long between-text should be filtered; got {triples:?}"
+    );
+}
+
+#[test]
+fn expanded_vocabulary_finds_chose_and_founded() {
+    let t = PredicateTable::default();
+    // Two sentences exercising the v1 polish vocabulary.
+    let text = "Alice chose Bawri. Bob founded Acme";
+    let ents = vec![
+        entity("Alice", "Person", (0, 5)),
+        entity("Bawri", "Place", (12, 17)),
+        entity("Bob", "Person", (19, 22)),
+        entity("Acme", "Organization", (31, 35)),
+    ];
+    let triples = extract_heuristic_relations(text, &ents, &t);
+    let preds: Vec<&str> = triples.iter().map(|t| t.predicate.as_str()).collect();
+    assert!(preds.contains(&"chose"), "got {triples:?}");
+    assert!(preds.contains(&"founded"), "got {triples:?}");
+}

@@ -71,6 +71,45 @@ impl Default for PredicateTable {
         for s in ["owns", "has", "possesses"] {
             t.add_synonym("owns", s);
         }
+        // expanded vocabulary (phase-3 v1 polish)
+        for s in ["chose", "selected", "picked", "opted for"] {
+            t.add_synonym("chose", s);
+        }
+        for s in ["avoided", "declined", "skipped"] {
+            t.add_synonym("avoided", s);
+        }
+        for s in ["introduced", "presented", "brought up"] {
+            t.add_synonym("introduced", s);
+        }
+        for s in ["arrived at", "got to", "made it to", "reached"] {
+            t.add_synonym("arrived_at", s);
+        }
+        for s in ["wrote", "authored", "drafted", "composed"] {
+            t.add_synonym("wrote", s);
+        }
+        for s in ["discussed", "talked about", "chatted about"] {
+            t.add_synonym("discussed", s);
+        }
+        for s in ["bought", "purchased", "acquired"] {
+            t.add_synonym("bought", s);
+        }
+        for s in ["sold", "traded"] {
+            t.add_synonym("sold", s);
+        }
+        for s in ["founded", "established"] {
+            t.add_synonym("founded", s);
+        }
+        for s in ["knows", "is acquainted with"] {
+            t.add_synonym("knows", s);
+        }
+        for s in ["hired", "recruited"] {
+            t.add_synonym("hired", s);
+        }
+        for s in ["married", "is married to"] {
+            t.add_synonym("married", s);
+        }
+        t.add_synonym("thanked", "thanked");
+        t.add_synonym("praised", "praised");
         t
     }
 }
