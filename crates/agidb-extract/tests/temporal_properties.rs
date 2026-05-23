@@ -55,7 +55,13 @@ fn nonsense_returns_none() {
 #[test]
 fn two_months_ago_lands_in_march_2026() {
     let r = parse_time_anchor("two months ago", anchor()).expect("parsed");
-    assert_eq!(r.start.month(), 3, "got month={} start={:?}", r.start.month(), r.start);
+    assert_eq!(
+        r.start.month(),
+        3,
+        "got month={} start={:?}",
+        r.start.month(),
+        r.start
+    );
 }
 
 #[test]

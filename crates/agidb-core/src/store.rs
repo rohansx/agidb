@@ -472,11 +472,7 @@ impl Store {
     /// Used by `agidb-extract`'s alias resolver to pre-create concepts
     /// with the NER-derived `entity_type` before `Store::observe` would
     /// otherwise auto-create them with `entity_type = "unknown"`.
-    pub fn create_concept(
-        &mut self,
-        canonical_name: &str,
-        entity_type: &str,
-    ) -> Result<ConceptId> {
+    pub fn create_concept(&mut self, canonical_name: &str, entity_type: &str) -> Result<ConceptId> {
         if let Some(existing) = self.concept_id_for(canonical_name)? {
             return Ok(existing);
         }

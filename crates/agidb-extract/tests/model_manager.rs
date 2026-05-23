@@ -35,7 +35,10 @@ fn offline_mode_errors_on_miss() {
     let r = fake_model_ref();
     let err = mgr.ensure_cached(&r).unwrap_err();
     let msg = format!("{err}");
-    assert!(msg.contains("offline"), "expected 'offline' in error; got: {msg}");
+    assert!(
+        msg.contains("offline"),
+        "expected 'offline' in error; got: {msg}"
+    );
 }
 
 #[test]

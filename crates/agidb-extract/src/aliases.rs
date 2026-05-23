@@ -27,12 +27,7 @@ impl AliasResolver {
     /// Resolve a surface `mention` to a `ConceptId`. Mints one when no
     /// exact / unique-fuzzy match is found, using `kind` as the new
     /// concept's `entity_type`.
-    pub fn resolve(
-        &self,
-        store: &mut Store,
-        mention: &str,
-        kind: &str,
-    ) -> Result<ConceptId> {
+    pub fn resolve(&self, store: &mut Store, mention: &str, kind: &str) -> Result<ConceptId> {
         let folded = mention.to_lowercase();
         if let Some(id) = store.concept_id_for_ci(&folded)? {
             return Ok(id);

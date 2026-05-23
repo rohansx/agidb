@@ -67,8 +67,7 @@ fn observe_text_stores_episode_with_triple() {
         provenance: Provenance::default(),
     };
 
-    let id = observe_text(&mut store, &extractor, "Sarah recommended Bawri", ctx)
-        .expect("observe");
+    let id = observe_text(&mut store, &extractor, "Sarah recommended Bawri", ctx).expect("observe");
 
     let ep = store.get_episode(id).expect("get").expect("found");
     assert_eq!(ep.id, id);
@@ -77,8 +76,15 @@ fn observe_text_stores_episode_with_triple() {
     assert_eq!(ep.triples[0].predicate, "recommends");
     assert_eq!(ep.triples[0].subject, "Sarah");
     assert_eq!(ep.triples[0].object, "Bawri");
-    assert_eq!(ep.triples[0].episode_id, id, "triple.episode_id points at its episode");
-    assert!(ep.confidence > 0.8, "confidence from extracted triple, got {}", ep.confidence);
+    assert_eq!(
+        ep.triples[0].episode_id, id,
+        "triple.episode_id points at its episode"
+    );
+    assert!(
+        ep.confidence > 0.8,
+        "confidence from extracted triple, got {}",
+        ep.confidence
+    );
 }
 
 #[test]
@@ -92,7 +98,10 @@ fn observe_text_with_empty_extraction_still_stores_with_gist_signature() {
     let ep = store.get_episode(id).expect("get").expect("found");
     assert_eq!(ep.text, "frobnicated");
     assert!(ep.triples.is_empty(), "no triples extracted");
-    assert!((ep.confidence - 0.5).abs() < 1e-6, "neutral confidence for empty extraction");
+    assert!(
+        (ep.confidence - 0.5).abs() < 1e-6,
+        "neutral confidence for empty extraction"
+    );
 }
 
 #[test]
@@ -101,8 +110,8 @@ fn observe_text_pre_creates_concepts_with_ner_entity_types() {
     let extractor = MockExtractor;
     let ctx = ObserveContext::default();
 
-    let _id = observe_text(&mut store, &extractor, "Sarah recommended Bawri", ctx)
-        .expect("observe");
+    let _id =
+        observe_text(&mut store, &extractor, "Sarah recommended Bawri", ctx).expect("observe");
 
     // Alias resolver should have pre-created the concepts so observe's
     // auto-creation (with entity_type="unknown") doesn't run.
@@ -121,10 +130,10 @@ fn observe_text_pre_creates_concepts_with_ner_entity_types() {
 fn observe_text_two_calls_get_distinct_episode_ids() {
     let (mut store, _d) = fresh_store();
     let extractor = MockExtractor;
-    let id1 = observe_text(&mut store, &extractor, "obs 1", ObserveContext::default())
-        .expect("first");
-    let id2 = observe_text(&mut store, &extractor, "obs 2", ObserveContext::default())
-        .expect("second");
+    let id1 =
+        observe_text(&mut store, &extractor, "obs 1", ObserveContext::default()).expect("first");
+    let id2 =
+        observe_text(&mut store, &extractor, "obs 2", ObserveContext::default()).expect("second");
     assert_ne!(id1, id2);
     assert!(id2.raw() > id1.raw());
 }
