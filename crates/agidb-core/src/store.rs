@@ -252,6 +252,23 @@ impl Store {
         Ok(episode_id)
     }
 
+    /// Fetch a Concept's canonical name by id. Used by
+    /// `agidb-extract::observe_text` to translate alias-resolved
+    /// `ConceptId`s back into the canonical names that `Triple` stores
+    /// — important when fuzzy match merges a typo'd mention into an
+    /// existing canonical concept ("Bandar" → existing "Bandra").
+    pub fn concept_canonical_name(&self, id: ConceptId) -> Result<Option<String>> {
+        let tx = self.db.begin_read()?;
+        let table = tx.open_table(CONCEPTS)?;
+        match table.get(id.raw())? {
+            Some(v) => {
+                let concept: Concept = decode(&v.value())?;
+                Ok(Some(concept.canonical_name))
+            }
+            None => Ok(None),
+        }
+    }
+
     /// Fetch an Episode by id.
     pub fn get_episode(&self, id: EpisodeId) -> Result<Option<Episode>> {
         let tx = self.db.begin_read()?;
