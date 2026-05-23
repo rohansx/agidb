@@ -350,6 +350,63 @@ impl From<SemanticAtom> for SemanticMatch {
 }
 
 // ---------------------------------------------------------------------------
+// Layer-2-facing types (consumed by agidb-extract; defined here so agidb-core
+// has no dependency on agidb-extract). Phase 3.
+// ---------------------------------------------------------------------------
+
+/// Caller-supplied context for an extraction call. The `observation_time`
+/// anchors any relative time expressions ("yesterday", "last weekend")
+/// the extractor parses out of the input.
+#[derive(Clone, Debug)]
+pub struct ExtractContext {
+    pub observation_time: DateTime<Utc>,
+    /// Optional whitelist of relation types the extractor should focus
+    /// on. Empty = use the extractor's built-in default vocabulary.
+    pub relation_hint_types: Vec<String>,
+}
+
+/// An entity identified by layer-2 NER. The `canonical_name` is
+/// populated by the alias resolver after extraction; until then it is
+/// `None`.
+#[derive(Clone, Debug)]
+pub struct Entity {
+    pub text: String,
+    pub entity_type: String,
+    /// `(start, end)` byte offsets into the original input string.
+    pub span: (usize, usize),
+    pub confidence: f32,
+    pub canonical_name: Option<String>,
+}
+
+/// A triple the extractor has identified but NOT yet bound to an
+/// [`EpisodeId`]. The `subject` / `object` strings are post-alias-
+/// resolution canonical names; the `predicate` is post-canonicalization.
+/// Promoted to a [`Triple`] by `agidb_extract::observe_text` once an
+/// episode id is minted.
+#[derive(Clone, Debug)]
+pub struct ExtractedTriple {
+    pub subject: String,
+    pub predicate: String,
+    pub object: String,
+    pub confidence: f32,
+}
+
+/// The output of a single [`TextExtractor::extract`] call.
+#[derive(Clone, Debug)]
+pub struct Extraction {
+    pub triples: Vec<ExtractedTriple>,
+    pub valid_time: Option<TimeRange>,
+    pub raw_entities: Vec<Entity>,
+}
+
+/// Layer-2 → layer-3 boundary. Any extractor that implements this can
+/// be passed to `agidb_extract::observe_text`. Defined here in
+/// `agidb-core` so the engine stays extraction-blind.
+pub trait TextExtractor {
+    fn extract(&self, text: &str, ctx: &ExtractContext) -> crate::Result<Extraction>;
+}
+
+// ---------------------------------------------------------------------------
 // Tests — round-trip the schema invariants
 // ---------------------------------------------------------------------------
 

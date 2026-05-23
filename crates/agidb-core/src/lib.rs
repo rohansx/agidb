@@ -22,3 +22,4 @@ pub mod store;
 pub mod types;
 
 pub use error::{AgidbError, Result};
+pub use types::{Entity, ExtractContext, ExtractedTriple, Extraction, TextExtractor};
