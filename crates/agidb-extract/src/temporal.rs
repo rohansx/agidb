@@ -51,7 +51,7 @@ fn last_weekend(now: DateTime<Utc>) -> Option<TimeRange> {
     let today = now.date_naive();
     let mut d = today - Duration::days(1);
     while d.weekday() != Weekday::Sat {
-        d = d - Duration::days(1);
+        d -= Duration::days(1);
     }
     let sat = d;
     let sun = sat + Duration::days(1);
@@ -93,7 +93,7 @@ fn this_weekend(now: DateTime<Utc>) -> Option<TimeRange> {
     let today = now.date_naive();
     let mut d = today;
     while d.weekday() != Weekday::Sat {
-        d = d + Duration::days(1);
+        d += Duration::days(1);
     }
     let sat = d;
     let sun = sat + Duration::days(1);
