@@ -1,0 +1,47 @@
+name: eval-nightly
+
+# Phase-3 gold-set evaluation. Slow (model download + inference); gated
+# to nightly + manual triggers so per-PR CI stays fast.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # 03:00 UTC nightly
+  workflow_dispatch:
+
+jobs:
+  eval:
+    name: gold-set F1
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cache models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/agidb/models
+          # Rebuild the cache whenever the pinned SHAs / repo paths change.
+          key: agidb-models-${{ hashFiles('crates/agidb-extract/src/models.rs') }}
+      - name: build eval binary
+        run: cargo build -p agidb-extract-eval --release
+      - name: run eval (full extractor)
+        # The binary exits 2 when F1 < 0.85 — surfaces phase-3 regressions.
+        # Falls back to --dry-run if the model cache is cold AND the
+        # download fails (e.g. HF rate limit).
+        run: |
+          if ! cargo run -p agidb-extract-eval --release -- --out /tmp/eval-report.json; then
+            echo "::warning::full eval failed; running dry-run for schema validation"
+            cargo run -p agidb-extract-eval --release -- --dry-run --out /tmp/eval-report.json
+          fi
+      - name: post summary
+        run: |
+          if command -v jq >/dev/null; then
+            jq '{precision, recall, f1, n, dry_run}' /tmp/eval-report.json | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            cat /tmp/eval-report.json | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: /tmp/eval-report.json

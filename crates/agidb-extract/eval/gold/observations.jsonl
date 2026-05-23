@@ -1,0 +1,3 @@
+{"text":"Sarah recommended Bawri in Bandra last weekend","triples":[{"subject":"Sarah","predicate":"recommends","object":"Bawri"},{"subject":"Bawri","predicate":"located_in","object":"Bandra"}],"notes":"placeholder — replace with the proper 100-sample gold set per phase-3 plan task 15"}
+{"text":"Bob works at Acme","triples":[{"subject":"Bob","predicate":"works_at","object":"Acme"}],"notes":"placeholder"}
+{"text":"Alice met Sarah","triples":[{"subject":"Alice","predicate":"met","object":"Sarah"}],"notes":"placeholder"}

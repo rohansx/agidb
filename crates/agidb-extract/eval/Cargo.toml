@@ -1,0 +1,24 @@
+[package]
+name = "agidb-extract-eval"
+description = "Phase-3 gold-set evaluation harness. Runs the agidb extractor over a labelled JSONL gold set and reports triple-level precision / recall / F1."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+publish = false
+
+[[bin]]
+name = "agidb-extract-eval"
+path = "src/main.rs"
+
+[dependencies]
+agidb-core = { workspace = true }
+agidb-extract = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+clap = { version = "4", features = ["derive"] }

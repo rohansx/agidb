@@ -4,6 +4,7 @@ members = [
     "crates/agidb",
     "crates/agidb-core",
     "crates/agidb-extract",
+    "crates/agidb-extract/eval",
     "crates/agidb-cli",
     "crates/agidb-mcp",
     "crates/agidb-py",
