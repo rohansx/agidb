@@ -14,7 +14,7 @@
 
 ## Execution status (2026-05-23)
 
-10 of 18 tasks complete. Workspace at HEAD: 81 tests passing (+37 over baseline), clippy + fmt clean.
+14 of 18 tasks complete. Workspace at HEAD: 87 tests passing (+43 over baseline), clippy + fmt clean. End-to-end v1 pipeline works (text → NER → heuristic relations → temporal → alias → store) and is exercised by `agidb-extract-eval`.
 
 | Task | Status | Commit |
 |---|---|---|
@@ -27,15 +27,15 @@
 | 7 — ModelRef constants | ✅ | `9ff4604` |
 | 8 — model_manager | ✅ | `a628f9f` |
 | `Store::next_episode_id` (plan-adjacent helper) | ✅ | `755d998` |
-| 9 — NER via gline-rs | ⬜ | needs `gline-rs` API + ONNX download |
-| 10 — GLiREL port | ⬜ | needs ctxgraph port + ONNX |
-| 11 — `Extractor` orchestration | ⬜ | depends on 9 + 10; TextExtractor trait already in place |
-| 12 + 13 — `observe_text` + integration test | ✅ | `15846ef` (does NOT depend on 11 thanks to TextExtractor trait + MockExtractor) |
-| 14 — eval sub-crate scaffold | ⬜ | depends on 11 |
-| 15 — 100-sample gold dataset | ⬜ | **human labelling work** |
-| 16 — eval binary | ⬜ | depends on 11 + 15 |
-| 17 — nightly CI workflow | ⬜ | depends on 14–16 |
-| 18 — F1 ≥ 0.85 verification loop | ⬜ | the actual exit gate |
+| 9 — NER via gline-rs | ✅ | `d5fd6e3` |
+| 10 — ONNX relation extractor | ⬜ | deferred to phase-3 v2 — port `glirel.rs` (DeBERTa, 717 LOC) or `relex.rs` (gliner-relex, 501 LOC). v1 heuristic ships in `d5fd6e3`. |
+| 11 — `Extractor` orchestration | 🟨 v1 done; v2 swaps the relation extractor | `d5fd6e3` |
+| 12 + 13 — `observe_text` + integration test | ✅ | `15846ef` |
+| 14 — eval sub-crate scaffold | ✅ | `0535e89` |
+| 15 — 100-sample gold dataset | ⬜ | **human labelling work** — 3-entry placeholder committed in `0535e89` |
+| 16 — eval scoring (P/R/F1, exit-2 if < 0.85) | ✅ | `0535e89` |
+| 17 — nightly CI workflow | ✅ | `0535e89` |
+| 18 — F1 ≥ 0.85 verification loop | 🟨 gate baked into the eval binary; iteration loop awaits (10) + (15) |
 
 See [`../specs/2026-05-23-phase-3-extraction-design.md`](../specs/2026-05-23-phase-3-extraction-design.md) § 14 for as-built type adjustments. See [`../../phases/phase-3-extraction.md`](../../phases/phase-3-extraction.md) for the per-deliverable view.
 

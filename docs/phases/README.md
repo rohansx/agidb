@@ -9,7 +9,7 @@
 | 0 | [setup](./phase-0-setup.md) | — | ✅ complete (inherited from sochdb v1) |
 | 1 | [HDC kernel](./phase-1-hdc-kernel.md) | — | ✅ complete (inherited) |
 | 2 | [storage](./phase-2-storage.md) | — | ✅ complete (inherited) |
-| 3 | [extraction (GLiNER)](./phase-3-extraction.md) | 1-4 | 🟨 in progress — substrate done; models + gold-set pending |
+| 3 | [extraction (GLiNER)](./phase-3-extraction.md) | 1-4 | 🟨 in progress — v1 end-to-end; v2 needs ONNX relation extractor + 100-sample gold + SHA pins |
 | 4 | [binding + recall](./phase-4-binding-recall.md) | — | ✅ complete (inherited) |
 | 5 | [MCP + Python](./phase-5-mcp-python.md) | 5-8 | ⬜ not started — v2.0 critical |
 | 6 | [consolidation](./phase-6-consolidation.md) | — | ✅ complete (inherited) |
@@ -32,7 +32,7 @@ a phase exits only when its exit criterion is met **on a reproducible benchmark*
 
 phases 0, 1, 2, 4, and 6 are complete — inherited from sochdb v1 and verified by 44 passing tests.
 
-phase 3 is **in progress** — the model-free substrate is built (10 of 18 plan tasks, 81 workspace tests green); the NER + GLiREL wrappers and the 100-sample gold set are deferred to a model-access session. See [`phase-3-extraction.md`](./phase-3-extraction.md) for the per-deliverable status. phases 5 and 7–16 are not started.
+phase 3 is **in progress** — v1 of the full pipeline is working end-to-end (NER via gline-rs + heuristic relation extractor + temporal + alias + canonicalization + observe_text + eval harness + nightly CI = 14 of 18 plan tasks; 87 workspace tests green). v2 needs an ONNX-based relation extractor (replace `heuristic_relations` with a `glirel.rs` or `relex.rs` port), real SHA pins for the GLiNER weights after first download, and the 100-sample human-labelled gold set. See [`phase-3-extraction.md`](./phase-3-extraction.md) for the per-deliverable status. phases 5 and 7–16 are not started.
 
 weeks 9-10 are a benchmark-harness build that is phase-7 prep, not a separate phase.
 

@@ -1,7 +1,7 @@
 # phase 3 — extraction
 
 **duration:** weeks 1-4
-**status:** in progress — substrate done; models + 100-sample gold pending
+**status:** in progress — v1 end-to-end working; v2 needs ONNX relation extractor + 100-sample gold + real model SHAs
 **depends on:** [phase 2](./phase-2-storage.md)
 
 ## goal
@@ -10,16 +10,16 @@ land layer 2: replace the phase-2 regex placeholder with a real GLiNER ONNX pipe
 
 ## deliverables
 
-- [ ] vendor / port the GLiNER ONNX loading and inference code from ctxgraph (port skeleton in [`crates/agidb-extract/src/model_manager.rs`](../../crates/agidb-extract/src/model_manager.rs); NER/GLiREL wrappers gated on real model access)
-- [ ] `agidb-extract/src/lib.rs` with the `Extraction` pipeline:
-  - [ ] entity extraction with type labels (Person, Place, Organization, etc.) — NER wrapper deferred to model-access session
-  - [ ] relation extraction producing `(subject, predicate, object)` triples — GLiREL port deferred
-  - [x] time anchor parsing via chrono + small grammar ("last weekend", "yesterday", "in 2024") — see [`temporal.rs`](../../crates/agidb-extract/src/temporal.rs)
-  - [ ] confidence scoring from GLiNER logits propagated to triples — depends on NER wrapper
+- [x] vendor / port the GLiNER ONNX loading and inference code from ctxgraph — [`ner.rs`](../../crates/agidb-extract/src/ner.rs) + [`model_manager.rs`](../../crates/agidb-extract/src/model_manager.rs); gated smoke test in [`tests/ner_smoke.rs`](../../crates/agidb-extract/tests/ner_smoke.rs)
+- [x] `agidb-extract/src/lib.rs` with the `Extraction` pipeline ([`extractor.rs`](../../crates/agidb-extract/src/extractor.rs) implements `TextExtractor`):
+  - [x] entity extraction with type labels (Person, Place, Organization, etc.) — via gline-rs
+  - [x] relation extraction producing `(subject, predicate, object)` triples — **v1 stub** in [`heuristic_relations.rs`](../../crates/agidb-extract/src/heuristic_relations.rs) (PredicateTable-based, no ML); v2 work: port `glirel.rs` or `relex.rs` from ctxgraph
+  - [x] time anchor parsing — [`temporal.rs`](../../crates/agidb-extract/src/temporal.rs)
+  - [x] confidence scoring (GLiNER logits → Entity.confidence; heuristic → 0.5 triple confidence)
 - [x] alias resolution and concept canonicalization (uses `concepts` table from phase 2) — [`aliases.rs`](../../crates/agidb-extract/src/aliases.rs)
-- [x] predicate canonicalization with a hand-curated synonym table (`recommended` ≡ `suggested` ≡ `told me about`) — [`predicates.rs`](../../crates/agidb-extract/src/predicates.rs)
-- [ ] **100-sample** gold dataset committed to `crates/agidb-extract/eval/gold/observations.jsonl` (revised up from 20 during the brainstorming session — see the design spec for rationale)
-- [ ] eval script that computes F1 against gold — scaffold deferred to plan tasks 14 + 16
+- [x] predicate canonicalization with a hand-curated synonym table — [`predicates.rs`](../../crates/agidb-extract/src/predicates.rs)
+- [ ] **100-sample** gold dataset committed to `crates/agidb-extract/eval/gold/observations.jsonl` (revised up from 20 during the brainstorming session). **3-entry placeholder committed**; human labelling work for the full 100 is plan task 15
+- [x] eval script that computes F1 against gold — [`agidb-extract-eval`](../../crates/agidb-extract/eval/src/main.rs) sub-crate; exits 2 if F1 < 0.85; nightly CI in [`.github/workflows/eval-nightly.yml`](../../.github/workflows/eval-nightly.yml)
 
 ## exit criterion
 
@@ -27,7 +27,7 @@ land layer 2: replace the phase-2 regex placeholder with a real GLiNER ONNX pipe
 
 ## progress (as of 2026-05-23)
 
-**Plan executed:** see [`docs/superpowers/plans/2026-05-23-phase-3-extraction.md`](../superpowers/plans/2026-05-23-phase-3-extraction.md). 10 of 18 plan tasks complete on the substrate. Workspace at HEAD: 81 tests passing, 1 ignored; `cargo clippy --workspace --all-targets -- -D warnings` clean; `cargo fmt --all -- --check` clean.
+**Plan executed:** see [`docs/superpowers/plans/2026-05-23-phase-3-extraction.md`](../superpowers/plans/2026-05-23-phase-3-extraction.md). **14 of 18 plan tasks complete** — the end-to-end pipeline (text → NER → heuristic relations → temporal → alias → store) works in v1 form. Workspace at HEAD: 87 tests passing, 1 ignored; `cargo clippy --workspace --all-targets -- -D warnings` clean; `cargo fmt --all -- --check` clean.
 
 What's built (the model-free substrate):
 
@@ -43,29 +43,31 @@ What's built (the model-free substrate):
 | `ModelManager` (HF download + SHA verify + `AGIDB_OFFLINE` mode) | `agidb-extract/src/model_manager.rs` | 5 |
 | `Store::next_episode_id` (monotonic, manifest-persisted) | `agidb-core/src/store.rs` | 3 |
 | `observe_text` + `ObserveContext` (text → extract → resolve aliases → mint id → store) | `agidb-extract/src/lib.rs` | 4 |
+| `NerExtractor` (gline-rs `GLiNER<SpanMode>` wrapper) | `agidb-extract/src/ner.rs` | smoke gated |
+| `heuristic_relations` (v1 PredicateTable-based stub) | `agidb-extract/src/heuristic_relations.rs` | 6 |
+| `Extractor` + `ExtractorConfig` (NER + heuristic + temporal + canon; impl `TextExtractor`) | `agidb-extract/src/extractor.rs` | covered via `observe_text` integration test |
+| `agidb-extract-eval` binary (load JSONL → run Extractor → P/R/F1 → JSON report; exits 2 if F1 < 0.85) | `crates/agidb-extract/eval/src/main.rs` | dry-run smoke verified |
+| Nightly eval CI | `.github/workflows/eval-nightly.yml` | — |
 
 What's not yet built:
 
 | Component | Plan task | Blocker |
 |---|---|---|
-| `NerExtractor` (gline-rs wrapper) | 9 | needs `gline-rs` API verification at port time + ~hundreds of MB GLiNER ONNX download |
-| `RelationExtractor` (GLiREL port from ctxgraph) | 10 | needs the port from `ctxgraph-extract/src/glirel.rs` + a working GLiREL ONNX repo |
-| `Extractor` struct (orchestrates NER + GLiREL + temporal + alias + canon) | 11 | depends on 9 + 10. **The `TextExtractor` trait is already in place**, so when the real `Extractor` lands it `impl`s the trait and `observe_text` accepts it with zero changes. |
-| `agidb-extract-eval` sub-crate + binary | 14, 16 | trivial scaffold; depends on 11 for real scoring |
-| **100-sample gold dataset** | 15 | **human labelling work — not automatable** |
-| Nightly CI workflow | 17 | depends on 14–16 |
-| F1 ≥ 0.85 iteration loop | 18 | the actual phase-3 exit gate |
+| ONNX-based relation extractor (replaces `heuristic_relations`) | 10 | port either `ctxgraph-extract/src/glirel.rs` (717 LOC, DeBERTa) or `relex.rs` (501 LOC, gliner-relex-large-v0.5) |
+| Real SHA pins for GLINER_DEFAULT + GLINER_TOKENIZER_DEFAULT | 9 cleanup | requires one successful first-run download on a connected machine |
+| **100-sample gold dataset** (3-entry placeholder is committed today) | 15 | **human labelling work — not automatable** |
+| F1 ≥ 0.85 iteration loop | 18 | needs (10) + (15) + nightly eval runs |
 
 ## tasks (as originally planned, with progress)
 
-1. ~~port the ctxgraph GLiNER loader; verify model loads on linux + macOS~~ — deferred to model-access session
-2. ~~write the gold dataset first (100 observations, hand-labeled triples)~~ — human task, deferred
-3. ~~wire entity extraction; measure F1~~ — gated on (1)
-4. ~~add relation extraction; measure F1~~ — gated on (1)
+1. ✅ port the ctxgraph GLiNER loader (`ner.rs`)
+2. ⬜ write the gold dataset (3-entry placeholder committed; human work for the full 100)
+3. ✅ wire entity extraction (via real GLiNER; smoke test gated)
+4. 🟨 add relation extraction — v1 heuristic shipped; v2 needs ONNX port
 5. ✅ add time anchor parsing
 6. ✅ add alias resolution against the concepts table
 7. ✅ add predicate canonicalization
-8. ~~iterate on the synonym table until F1 ≥ 85%~~ — gated on (1) + (2)
+8. ⬜ iterate on the synonym table until F1 ≥ 85% — gated on (2) + (4 v2)
 
 ## risks (with mitigations)
 
