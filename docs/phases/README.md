@@ -11,7 +11,7 @@
 | 2 | [storage](./phase-2-storage.md) | — | ✅ complete (inherited) |
 | 3 | [extraction (GLiNER)](./phase-3-extraction.md) | 1-4 | 🟨 in progress — v1 end-to-end; v2 needs ONNX relation extractor + 100-sample gold + SHA pins |
 | 4 | [binding + recall](./phase-4-binding-recall.md) | — | ✅ complete (inherited) |
-| 5 | [MCP + Python](./phase-5-mcp-python.md) | 5-8 | ⬜ not started — v2.0 critical |
+| 5 | [MCP + Python](./phase-5-mcp-python.md) | 5-8 | 🟨 in progress — MCP server scaffold done; Python bindings not started |
 | 6 | [consolidation](./phase-6-consolidation.md) | — | ✅ complete (inherited) |
 | 7 | [decision gate](./phase-7-decision-gate.md) | 11-13 | ⬜ not started — **binding** |
 | 8 | [hardening + launch](./phase-8-hardening-launch.md) | 31-36 | ⬜ not started — v2.0 ship |
@@ -32,7 +32,11 @@ a phase exits only when its exit criterion is met **on a reproducible benchmark*
 
 phases 0, 1, 2, 4, and 6 are complete — inherited from sochdb v1 and verified by 44 passing tests.
 
-phase 3 is **in progress** — v1 of the full pipeline is working end-to-end (NER via gline-rs + heuristic relation extractor + temporal + alias + canonicalization + observe_text + eval harness + nightly CI = 14 of 18 plan tasks; 87 workspace tests green). v2 needs an ONNX-based relation extractor (replace `heuristic_relations` with a `glirel.rs` or `relex.rs` port), real SHA pins for the GLiNER weights after first download, and the 100-sample human-labelled gold set. See [`phase-3-extraction.md`](./phase-3-extraction.md) for the per-deliverable status. phases 5 and 7–16 are not started.
+phase 3 is **in progress** — v1 of the full pipeline is working end-to-end (NER via gline-rs + heuristic relation extractor + temporal + alias + canonicalization + observe_text + eval harness + nightly CI). v2 needs an ONNX-based relation extractor (replace `heuristic_relations` with a `glirel.rs` or `relex.rs` port), real SHA pins for the GLiNER weights after first download, and the 100-sample human-labelled gold set. See [`phase-3-extraction.md`](./phase-3-extraction.md) for the per-deliverable status.
+
+phase 5 has been **partially scaffolded** out of order — the MCP server (stdio JSON-RPC with `memory_observe`, `memory_recall`, `memory_consolidate`, `memory_get_episode`) lives and is tested; `memory_what_about` / `memory_between` await the underlying `Store` methods; pyo3 bindings + python wheels are entirely untouched. See [`phase-5-mcp-python.md`](./phase-5-mcp-python.md).
+
+phases 7–16 are not started.
 
 weeks 9-10 are a benchmark-harness build that is phase-7 prep, not a separate phase.
 
