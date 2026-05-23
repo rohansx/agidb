@@ -380,6 +380,41 @@ impl Store {
         }
         Ok(count)
     }
+
+    /// Idempotent on canonical name: if a Concept with this name already
+    /// exists, return its `ConceptId` unchanged. Otherwise mint a new id,
+    /// persist a Concept row with `entity_type` set, and return it.
+    ///
+    /// Used by `agidb-extract`'s alias resolver to pre-create concepts
+    /// with the NER-derived `entity_type` before `Store::observe` would
+    /// otherwise auto-create them with `entity_type = "unknown"`.
+    pub fn create_concept(
+        &mut self,
+        canonical_name: &str,
+        entity_type: &str,
+    ) -> Result<ConceptId> {
+        if let Some(existing) = self.concept_id_for(canonical_name)? {
+            return Ok(existing);
+        }
+        let tx = self.db.begin_write()?;
+        let id;
+        {
+            let mut concepts = tx.open_table(CONCEPTS)?;
+            let mut by_name = tx.open_table(CONCEPT_BY_NAME)?;
+            let mut manifest = tx.open_table(MANIFEST)?;
+            id = next_concept_id(&mut manifest)?;
+            let concept = Concept {
+                id,
+                canonical_name: canonical_name.to_string(),
+                aliases: Vec::new(),
+                entity_type: entity_type.to_string(),
+            };
+            concepts.insert(id.raw(), encode(&concept)?)?;
+            by_name.insert(canonical_name, id.raw())?;
+        }
+        tx.commit()?;
+        Ok(id)
+    }
 }
 
 // ---------------------------------------------------------------------------
