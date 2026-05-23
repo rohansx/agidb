@@ -57,6 +57,13 @@ const KEY_FORMAT_VERSION: &str = "format_version";
 /// Manifest key for the next-concept-id counter (u64).
 const KEY_NEXT_CONCEPT_ID: &str = "next_concept_id";
 
+/// Manifest key for the next-episode-id counter (u64). Used by
+/// `agidb-extract::observe_text` to mint ids monotonically across
+/// reopens. Caller-supplied ids in `Store::observe` (used by the phase-2
+/// tests) bypass this counter — collisions remain last-writer-wins
+/// until the phase-4 sequence-counter contract.
+const KEY_NEXT_EPISODE_ID: &str = "next_episode_id";
+
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
@@ -379,6 +386,27 @@ impl Store {
             count += 1;
         }
         Ok(count)
+    }
+
+    /// Mint a fresh `EpisodeId`. Monotonic and persisted across reopens
+    /// via the `next_episode_id` manifest counter. Used by
+    /// `agidb-extract::observe_text` so callers don't have to manage ids
+    /// themselves.
+    pub fn next_episode_id(&mut self) -> Result<EpisodeId> {
+        let tx = self.db.begin_write()?;
+        let id;
+        {
+            let mut manifest = tx.open_table(MANIFEST)?;
+            let raw = manifest.get(KEY_NEXT_EPISODE_ID)?.map(|v| v.value());
+            let current: u64 = match raw {
+                Some(bytes) => decode(&bytes)?,
+                None => 1,
+            };
+            manifest.insert(KEY_NEXT_EPISODE_ID, encode(&(current + 1))?)?;
+            id = EpisodeId::new(current);
+        }
+        tx.commit()?;
+        Ok(id)
     }
 
     /// Case-insensitive lookup against `CONCEPT_BY_NAME`. O(N); fine for
