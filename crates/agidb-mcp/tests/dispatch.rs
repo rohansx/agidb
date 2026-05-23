@@ -133,7 +133,10 @@ fn recall_after_observe_returns_a_match() {
         .to_string();
     let payload: Value = serde_json::from_str(&text).expect("inner");
     // Per article VI, recall never returns empty under the default tier_floor.
-    assert!(payload["matches"].as_array().expect("matches array").len() > 0);
+    assert!(!payload["matches"]
+        .as_array()
+        .expect("matches array")
+        .is_empty());
 }
 
 #[test]
