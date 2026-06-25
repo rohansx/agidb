@@ -27,18 +27,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # linux glibc — covers Ubuntu, Debian, Fedora, RHEL, Arch, Mint
+          # linux glibc — covers Ubuntu, Debian, Fedora, RHEL, Arch, Mint.
+          # arm64 uses the hosted GitHub arm64 runner (free for public
+          # repos since Aug 2024) which ships gcc 12 / glibc 2.39 —
+          # the same toolchain ort-sys 2 expects. The cross-rs route
+          # tried earlier failed because the project's aarch64 images
+          # only ship gcc 9 / glibc 2.31, which is too old to link
+          # onnxruntime's absl::inlined_vector_storage.
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             arch: x86_64
             archive: tar.gz
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-24.04-arm
             arch: aarch64
             archive: tar.gz
-            cross: true
-            # image override is in Cross.toml (the CROSS_IMAGE env
-            # var alone is ignored by cross-rs 0.2.5).
           # macOS — Intel + Apple silicon
           - target: x86_64-apple-darwin
             os: macos-14
@@ -61,27 +64,22 @@ jobs:
         with:
           cache-on-failure: true
 
-      - name: install cross
-        if: matrix.cross
-        run: cargo install cross --git https://github.com/cross-rs/cross --locked
-
       - name: build agidb-cli (release, stripped)
         run: |
-          if [ "${{ matrix.cross }}" = "true" ]; then
-            cross build --release --target ${{ matrix.target }} -p agidb-cli --bin agidb
-          else
-            cargo build --release --target ${{ matrix.target }} -p agidb-cli --bin agidb
-          fi
+          cargo build --release --target ${{ matrix.target }} -p agidb-cli --bin agidb
           # strip for size — release profile already strips but be defensive
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            strip "target/${{ matrix.target }}/release/agidb"
-          fi
+          strip "target/${{ matrix.target }}/release/agidb" 2>/dev/null || true
           ls -lh "target/${{ matrix.target }}/release/agidb"
 
       - name: package
         run: |
           mkdir -p dist
-          ASSET="agidb-${{ github.ref_name }}-${{ matrix.os == 'ubuntu-latest' && 'linux' || 'darwin' }}-${{ matrix.arch }}.tar.gz"
+          case "${{ matrix.os }}" in
+            ubuntu-*|ubuntu) OS=linux ;;
+            macos-*)        OS=darwin ;;
+            *)              OS=unknown ;;
+          esac
+          ASSET="agidb-${{ github.ref_name }}-${OS}-${{ matrix.arch }}.tar.gz"
           BIN="target/${{ matrix.target }}/release/agidb"
           cp "$BIN" "dist/agidb"
           tar -C dist -czf "$ASSET" agidb
