@@ -9,7 +9,7 @@ use crate::hdc::{D_BYTES, HV};
 use crate::signatures::SignatureFile;
 use crate::types::*;
 use chrono::{DateTime, Duration, Utc};
-use redb::{Database, MultimapTableDefinition, ReadableTable, TableDefinition};
+use redb::{Database, MultimapTableDefinition, ReadableTable, ReadableTableMetadata, TableDefinition};
 use roaring::RoaringBitmap;
 use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader, Write};
@@ -98,6 +98,19 @@ pub struct ConsolidationLogEntry {
     pub bytes_reclaimed: u64,
 }
 
+/// A snapshot of store-wide counts. Returned by [`Store::stats`].
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Stats {
+    pub episodes: u64,
+    pub concepts: u64,
+    pub semantic_atoms: u64,
+    pub goals: u64,
+    pub beliefs: u64,
+    pub consolidation_passes: u64,
+    /// Number of HVs stored in `signatures.dat` (each is 1024 bytes).
+    pub signatures: u64,
+}
+
 /// Owning handle to a agidb store — the redb database + the mmap'd
 /// signatures file held together.
 pub struct Store {
@@ -152,6 +165,16 @@ impl Store {
                 let _ = tx.open_table(INVERTED_INDEX)?;
                 let _ = tx.open_table(SEMANTIC_ATOMS)?;
                 let _ = tx.open_table(CONSOLIDATION_LOG)?;
+                // Phase 9 — cognitive primitives (additive; v1 stores
+                // simply have empty goals/beliefs tables).
+                let _ = tx.open_table(crate::goal::GOALS)?;
+                let _ = tx.open_table(crate::belief::BELIEFS)?;
+                let _ = tx.open_table(crate::belief::BELIEF_REVISIONS)?;
+                // Phase 10 — self-model audit log + self-vector history.
+                let _ = tx.open_table(crate::learning_log::LEARNING_EVENTS)?;
+                let _ = tx.open_table(crate::self_model::SELF_VECTOR_HISTORY)?;
+                // Phase 11 — unlearn tombstones.
+                let _ = tx.open_table(crate::unlearn::TOMBSTONES)?;
             }
             tx.commit()?;
         }
@@ -161,6 +184,14 @@ impl Store {
             signatures,
             config,
         })
+    }
+
+    /// Open or create + initialize the self-vector. Convenience wrapper
+    /// so callers don't need to remember the init step.
+    pub fn open_initialized(config: StoreConfig) -> Result<Self> {
+        let mut store = Self::open(config)?;
+        store.init_self_vector()?;
+        Ok(store)
     }
 
     /// Persist an Episode + its HV signature in one transactional unit.
@@ -248,6 +279,13 @@ impl Store {
         }
         tx.commit()?;
         self.signatures.flush()?;
+
+        // Phase 10 — emit a learning event (after the tx commits so
+        // record_event's own write tx doesn't deadlock).
+        let _ = self.record_event(crate::learning_log::LearningEvent::EpisodeStored {
+            id: episode_id,
+            at: Utc::now(),
+        });
 
         Ok(episode_id)
     }
@@ -353,6 +391,44 @@ impl Store {
     /// this just flushes the signatures mmap.
     pub fn flush(&self) -> Result<()> {
         self.signatures.flush()
+    }
+
+    /// Row counts for every table plus the on-disk signature file size.
+    /// Cheap (one read transaction, four `len()` calls) and safe to call
+    /// at any time.
+    pub fn stats(&self) -> Result<Stats> {
+        let tx = self.db.begin_read()?;
+        let episodes = tx.open_table(EPISODES)?.len()?;
+        let concepts = tx.open_table(CONCEPTS)?.len()?;
+        let semantic_atoms = tx.open_table(SEMANTIC_ATOMS)?.len()?;
+        let goals = tx.open_table(crate::goal::GOALS)?.len()?;
+        let beliefs = tx.open_table(crate::belief::BELIEFS)?.len()?;
+        let consolidation_passes = tx.open_table(CONSOLIDATION_LOG)?.len()?;
+        Ok(Stats {
+            episodes,
+            concepts,
+            semantic_atoms,
+            goals,
+            beliefs,
+            consolidation_passes,
+            signatures: self.signatures.len(),
+        })
+    }
+
+    /// Return up to `limit` episodes in id (ascending) order. Used by the
+    /// CLI `list` command for a quick "what's in the store" view.
+    pub fn list_episodes(&self, limit: usize) -> Result<Vec<Episode>> {
+        let tx = self.db.begin_read()?;
+        let table = tx.open_table(EPISODES)?;
+        let mut out = Vec::with_capacity(limit.min(256));
+        for entry in table.iter()? {
+            if out.len() >= limit {
+                break;
+            }
+            let (_, v) = entry?;
+            out.push(decode(&v.value())?);
+        }
+        Ok(out)
     }
 
     /// Dump every Episode (with its HV) as JSON lines. Round-trips
@@ -507,11 +583,11 @@ struct ExportRecord {
     hv: Vec<u8>,
 }
 
-fn encode<T: serde::Serialize>(value: &T) -> Result<Vec<u8>> {
+pub(crate) fn encode<T: serde::Serialize>(value: &T) -> Result<Vec<u8>> {
     bincode::serialize(value).map_err(|e| AgidbError::Internal(format!("bincode encode: {e}")))
 }
 
-fn decode<T: for<'de> serde::Deserialize<'de>>(bytes: &[u8]) -> Result<T> {
+pub(crate) fn decode<T: for<'de> serde::Deserialize<'de>>(bytes: &[u8]) -> Result<T> {
     bincode::deserialize(bytes).map_err(|e| AgidbError::Internal(format!("bincode decode: {e}")))
 }
 

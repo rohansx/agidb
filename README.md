@@ -103,6 +103,51 @@ async fn main() -> anyhow::Result<()> {
 }
 ```
 
+## demo
+
+The fastest way to see agidb work is the bundled example — it runs the
+"Sarah recommends Bawri" scenario end-to-end (observe → tier-A exact
+recall → sleep-like consolidation mints a semantic atom → atom surfaces
+in recall), fully offline and deterministic:
+
+```bash
+cargo run --example sarah_bawri
+```
+
+There is also a real CLI:
+
+```bash
+# record an observation (auto-loads GLiNER; --offline stores text-only)
+agidb observe ./mem.agidb "Sarah recommended Bawri in Bandra last weekend"
+agidb recall  ./mem.agidb "what did Sarah mention?"
+agidb consolidate ./mem.agidb
+agidb stats  ./mem.agidb
+agidb list   ./mem.agidb
+agidb export ./mem.agidb dump.jsonl
+# expose agidb to Claude Desktop / Cursor over MCP stdio:
+agidb serve  ./mem.agidb
+```
+
+The umbrella crate's [`Agidb`](https://docs.rs/agidb) facade ties the
+whole pipeline together — text in, structured triples out, signed,
+indexed, bi-temporally stamped, and recallable by cue, in one object:
+
+```rust
+use agidb::Agidb;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let db = Agidb::open("./memory.agidb").await?;
+    db.observe("Sarah recommended Bawri in Bandra last weekend").await?;
+    let r = db.recall_cue("what did Sarah mention?").await?;
+    for m in &r.matches {
+        println!("[{:.2}] {}", m.confidence, m.text);
+    }
+    db.consolidate().await?; // sleep → semantic atoms
+    Ok(())
+}
+```
+
 ## the architecture in one paragraph
 
 agidb is built in three engineering layers that implement seven cognitive floors. **layer 1** is the mind-like layer: every memory becomes an 8192-bit hyperdimensional signature, and retrieval is bit-overlap counting (POPCOUNT) over stored signatures. **layer 2** is the scaffolding: GLiNER ONNX extracts entities and relations locally so signatures encode meaning rather than phrasing; from v2.1, V-JEPA 2 + Wav2Vec-BERT extend this to video and audio. **layer 3** is the storage: redb for metadata and bi-temporal indexes, mmap'd flat files for signatures, append-only logs for the self-model audit trail. these three engineering layers together implement the seven floors of an AGI substrate: sensory buffer, working memory, episodic memory, semantic memory, procedural memory, goals + beliefs, and the self-model. the user only ever sees the seven floors.

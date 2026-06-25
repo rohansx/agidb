@@ -27,6 +27,30 @@ const D_U64: usize = D_BYTES / 8;
 #[repr(C, align(64))]
 pub struct HV(pub [u8; D_BYTES]);
 
+// Manual serde impls — serde's built-in array support tops out at 512
+// elements, but D_BYTES = 1024. Serialize as a Vec<u8> for portability.
+impl serde::Serialize for HV {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        serde::Serialize::serialize(&self.0.to_vec(), s)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for HV {
+    fn deserialize<Dser: serde::Deserializer<'de>>(d: Dser) -> std::result::Result<Self, Dser::Error> {
+        let v: Vec<u8> = serde::Deserialize::deserialize(d)?;
+        if v.len() != D_BYTES {
+            return Err(serde::de::Error::custom(format!(
+                "expected {} hv bytes, got {}",
+                D_BYTES,
+                v.len()
+            )));
+        }
+        let mut bytes = [0u8; D_BYTES];
+        bytes.copy_from_slice(&v);
+        Ok(HV(bytes))
+    }
+}
+
 impl HV {
     /// All-zero hypervector. Useful as a bundling accumulator.
     pub const fn zero() -> Self {

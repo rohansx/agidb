@@ -36,6 +36,15 @@ pub enum AgidbError {
     #[error("episode not found: {0}")]
     UnknownEpisode(u64),
 
+    #[error("goal not found: {0}")]
+    UnknownGoal(u64),
+
+    #[error("belief not found: {0}")]
+    UnknownBelief(u64),
+
+    #[error("invalid goal transition: {0}")]
+    InvalidGoalTransition(String),
+
     #[error("format version mismatch (got {got}, expected {expected})")]
     FormatVersion { got: u32, expected: u32 },
 

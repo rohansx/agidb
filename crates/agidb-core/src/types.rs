@@ -58,6 +58,16 @@ id_newtype!(
     TripleId
 );
 
+id_newtype!(
+    /// Identifier for a [`Goal`] (floor 6). Phase 9.
+    GoalId
+);
+
+id_newtype!(
+    /// Identifier for a [`Belief`] (floor 6). Phase 9.
+    BeliefId
+);
+
 // ---------------------------------------------------------------------------
 // Time & provenance
 // ---------------------------------------------------------------------------
@@ -201,6 +211,236 @@ pub struct ProcedureStep {
 }
 
 // ---------------------------------------------------------------------------
+// Cognitive primitives — Goals and Beliefs (floor 6). Phase 9.
+// ---------------------------------------------------------------------------
+
+/// One testable success criterion on a [`Goal`]. Free-form description
+/// plus optional evidence episodes that satisfy it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SuccessCriterion {
+    pub description: String,
+    /// Episode ids that the agent claims satisfy this criterion.
+    pub evidence: Vec<EpisodeId>,
+    /// `true` once the agent marks the criterion met.
+    pub met: bool,
+}
+
+/// Lifecycle state of a [`Goal`]. `Completed` and `Abandoned` are
+/// terminal (constitution article XV). Every transition emits a
+/// `LearningEvent::GoalStateChanged` (phase 10).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum GoalState {
+    Active,
+    Paused {
+        since: DateTime<Utc>,
+        reason: String,
+    },
+    Completed {
+        at: DateTime<Utc>,
+        evidence: Vec<EpisodeId>,
+    },
+    Abandoned {
+        at: DateTime<Utc>,
+        reason: String,
+    },
+}
+
+impl GoalState {
+    /// `true` for `Completed` and `Abandoned` — no further transitions
+    /// are allowed out of a terminal state.
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, GoalState::Completed { .. } | GoalState::Abandoned { .. })
+    }
+
+    /// `true` iff the goal is currently biasing recall (only `Active`).
+    pub fn is_active(&self) -> bool {
+        matches!(self, GoalState::Active)
+    }
+}
+
+/// What the agent wants. Floor 6. A typed state machine with optional
+/// parent-child hierarchy and an HDC signature for goal-biased retrieval.
+///
+/// Constitution article XV: goals are a first-class typed substrate
+/// primitive, not text inside an episode.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Goal {
+    pub id: GoalId,
+    pub parent_id: Option<GoalId>,
+    pub description: String,
+    pub state: GoalState,
+    pub success_criteria: Vec<SuccessCriterion>,
+    pub deadline: Option<DateTime<Utc>>,
+    /// Byte offset into `signatures.dat` where this goal's HV lives.
+    pub signature_offset: u64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub provenance: Provenance,
+}
+
+impl Goal {
+    /// Construct a new in-memory goal with `Active` state and an empty
+    /// criteria list. `id`, `signature_offset`, and timestamps are
+    /// populated by [`crate::store::Store::set_goal`] on persist.
+    pub fn new(description: impl Into<String>) -> Self {
+        let now = Utc::now();
+        Self {
+            id: GoalId::new(0),
+            parent_id: None,
+            description: description.into(),
+            state: GoalState::Active,
+            success_criteria: Vec::new(),
+            deadline: None,
+            signature_offset: 0,
+            created_at: now,
+            updated_at: now,
+            provenance: Provenance::default(),
+        }
+    }
+
+    pub fn with_parent(mut self, parent: GoalId) -> Self {
+        self.parent_id = Some(parent);
+        self
+    }
+
+    pub fn with_deadline(mut self, deadline: DateTime<Utc>) -> Self {
+        self.deadline = Some(deadline);
+        self
+    }
+
+    pub fn with_success_criterion(mut self, description: impl Into<String>) -> Self {
+        self.success_criteria.push(SuccessCriterion {
+            description: description.into(),
+            evidence: Vec::new(),
+            met: false,
+        });
+        self
+    }
+
+    pub fn with_provenance(mut self, provenance: Provenance) -> Self {
+        self.provenance = provenance;
+        self
+    }
+}
+
+/// A patch applied by [`crate::store::Store::revise_goal`]. Any `None`
+/// field is left unchanged.
+#[derive(Clone, Debug, Default)]
+pub struct GoalPatch {
+    pub description: Option<String>,
+    pub deadline: Option<Option<DateTime<Utc>>>,
+    pub success_criteria: Option<Vec<SuccessCriterion>>,
+}
+
+/// What a [`crate::store::Store::revise_belief`] call did. Returned to
+/// the caller and persisted as a `BeliefRevision` on the belief's
+/// append-only log (constitution article XVII).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RevisionReport {
+    pub belief_id: BeliefId,
+    pub previous_confidence: f32,
+    pub new_confidence: f32,
+    pub triggering_evidence: Option<EpisodeId>,
+    pub reason: String,
+    /// `true` iff the belief was withdrawn (confidence dropped below the
+    /// withdrawal threshold).
+    pub withdrawn: bool,
+}
+
+/// One entry in a [`Belief`]'s append-only `revision_log`. Replaying the
+/// log reconstructs the current confidence. Constitution article XVII.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BeliefRevision {
+    pub timestamp: DateTime<Utc>,
+    pub previous_confidence: f32,
+    pub new_confidence: f32,
+    pub triggering_evidence: Option<EpisodeId>,
+    pub reason: String,
+}
+
+/// What the agent thinks is true. Floor 6. A graded, revisable claim:
+/// confidence in `[0.0, 1.0]`, supporting `evidence` and conflicting
+/// `contradictions` (both lists of `EpisodeId`), and an append-only
+/// `revision_log`. Constitution article XVII: beliefs are revised, never
+/// overwritten.
+///
+/// `subject` and `predicate` are stored as strings (canonical concept
+/// names) so beliefs are queryable by subject without a separate index
+/// in v0.1; a `ConceptId`-keyed index is a phase-9 follow-up.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Belief {
+    pub id: BeliefId,
+    pub claim: String,
+    pub subject: String,
+    pub predicate: String,
+    pub object: String,
+    pub confidence: f32,
+    pub evidence: Vec<EpisodeId>,
+    pub contradictions: Vec<EpisodeId>,
+    pub revision_log: Vec<BeliefRevision>,
+    /// Byte offset into `signatures.dat` where this belief's HV lives.
+    pub signature_offset: u64,
+    pub t_valid_start: DateTime<Utc>,
+    pub t_valid_end: Option<DateTime<Utc>>,
+    pub t_tx_start: DateTime<Utc>,
+    pub provenance: Provenance,
+}
+
+impl Belief {
+    /// Construct a new in-memory belief. `id`, `signature_offset`, and
+    /// `t_tx_start` are populated by [`crate::store::Store::assert_belief`].
+    pub fn new(claim: impl Into<String>) -> Self {
+        Self {
+            id: BeliefId::new(0),
+            claim: claim.into(),
+            subject: String::new(),
+            predicate: String::new(),
+            object: String::new(),
+            confidence: 0.5,
+            evidence: Vec::new(),
+            contradictions: Vec::new(),
+            revision_log: Vec::new(),
+            signature_offset: 0,
+            t_valid_start: Utc::now(),
+            t_valid_end: None,
+            t_tx_start: Utc::now(),
+            provenance: Provenance::default(),
+        }
+    }
+
+    pub fn with_confidence(mut self, c: f32) -> Self {
+        self.confidence = c.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Decompose the claim into a `(subject, predicate, object)` triple
+    /// shape so `what_do_i_believe(subject)` can find it. Subjects and
+    /// objects are matched case-sensitively against canonical concept
+    /// names (same convention as tier-A recall).
+    pub fn with_triple(mut self, subject: impl Into<String>, predicate: impl Into<String>, object: impl Into<String>) -> Self {
+        self.subject = subject.into();
+        self.predicate = predicate.into();
+        self.object = object.into();
+        self
+    }
+
+    pub fn with_evidence(mut self, episodes: Vec<EpisodeId>) -> Self {
+        self.evidence = episodes;
+        self
+    }
+
+    pub fn with_provenance(mut self, provenance: Provenance) -> Self {
+        self.provenance = provenance;
+        self
+    }
+
+    /// `true` iff the belief is currently withdrawn (closed valid-time).
+    pub fn is_withdrawn(&self) -> bool {
+        self.t_valid_end.is_some()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Retrieval
 // ---------------------------------------------------------------------------
 
@@ -252,11 +492,17 @@ pub struct Query {
     /// Deepest tier the cascade is allowed to fall through to. Default
     /// is [`Tier::NearestNeighbor`] (i.e. anything goes).
     pub tier_floor: Tier,
+    /// Goal-bias weight in `[0.0, 1.0]`. When > 0, active goals' HDC
+    /// signatures up-weight episode matches semantically related to
+    /// those goals. `0.0` (the default) disables biasing so recall is
+    /// purely cue-driven. Phase 9.
+    pub goal_bias_weight: f32,
 }
 
 impl Query {
     /// Construct a query with sensible defaults: `k = 10`,
-    /// `min_confidence = 0.0`, `tier_floor = NearestNeighbor`.
+    /// `min_confidence = 0.0`, `tier_floor = NearestNeighbor`,
+    /// `goal_bias_weight = 0.0`.
     pub fn cue(text: impl Into<String>) -> Self {
         Self {
             cue: text.into(),
@@ -264,6 +510,7 @@ impl Query {
             as_of: None,
             min_confidence: 0.0,
             tier_floor: Tier::NearestNeighbor,
+            goal_bias_weight: 0.0,
         }
     }
 
@@ -286,6 +533,13 @@ impl Query {
         self.tier_floor = t;
         self
     }
+
+    /// Enable goal-biased retrieval with the given weight (clamped to
+    /// `[0, 1]`). Active goals up-weight related matches. Phase 9.
+    pub fn with_goal_bias(mut self, weight: f32) -> Self {
+        self.goal_bias_weight = weight.clamp(0.0, 1.0);
+        self
+    }
 }
 
 /// The result of a recall. Per [constitution](../../.specify/memory/constitution.md)
@@ -299,6 +553,11 @@ impl Query {
 pub struct Recall {
     pub matches: Vec<RecallMatch>,
     pub semantic_atoms: Vec<SemanticMatch>,
+    /// `true` iff goal-biased reweighting was applied. Phase 9.
+    pub goal_biased: bool,
+    /// The active goals that biased this recall (empty if unbiased).
+    /// Phase 9.
+    pub active_goals: Vec<GoalId>,
     /// The shallowest tier that contributed at least one match.
     pub tier_used: Tier,
     /// Wall-clock elapsed time of the recall call, in milliseconds.

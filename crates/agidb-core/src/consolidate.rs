@@ -97,6 +97,23 @@ impl Store {
             bytes_reclaimed: report.bytes_reclaimed,
         })?;
 
+        // Phase 10 — update the self-vector via EMA toward the bundle of
+        // newly-created atom signatures. Skip if no atoms were created.
+        if semantic_atoms_created > 0 {
+            let atom_sigs = self.load_atom_signatures()?;
+            if !atom_sigs.is_empty() {
+                let bundle = crate::hdc::HV::bundle(&atom_sigs);
+                let _drift = self.update_self_vector(&bundle, crate::self_model::SELF_VECTOR_ALPHA)?;
+            }
+        }
+
+        // Phase 10 — emit a learning event for this consolidation pass.
+        self.record_event(crate::learning_log::LearningEvent::ConsolidationRun {
+            atoms_created: semantic_atoms_created,
+            contradictions: contradictions_detected,
+            at,
+        })?;
+
         Ok(report)
     }
 
@@ -243,6 +260,23 @@ impl Store {
             }
         }
         Ok(count)
+    }
+
+    /// Load the signatures of all semantic atoms — used by the
+    /// self-vector EMA update.
+    fn load_atom_signatures(&self) -> Result<Vec<crate::hdc::HV>> {
+        let tx = self.db.begin_read()?;
+        let table = tx.open_table(SEMANTIC_ATOMS)?;
+        let mut out = Vec::new();
+        for entry in table.iter()? {
+            let (_, v) = entry?;
+            let atom: SemanticAtom = bincode::deserialize(&v.value())
+                .map_err(|e| AgidbError::Internal(format!("decode atom: {e}")))?;
+            if let Ok(sig) = self.signatures.read(atom.signature_offset) {
+                out.push(sig);
+            }
+        }
+        Ok(out)
     }
 
     fn write_log_entry(&self, entry: &ConsolidationLogEntry) -> Result<()> {

@@ -18,6 +18,7 @@
 
 use crate::episode::{encode_gist_signature, encode_query_signature, tokenize};
 use crate::error::{AgidbError, Result};
+use crate::hdc::HV;
 use crate::store::{Store, EPISODES, SEMANTIC_ATOMS};
 use crate::types::*;
 use redb::ReadableTable;
@@ -43,8 +44,34 @@ impl Store {
     /// 6 surfaces consolidated knowledge alongside raw episodes.
     pub fn recall(&self, query: &Query) -> Result<Recall> {
         let started = Instant::now();
-        let matches = self.run_cascade(query)?;
+        let mut matches = self.run_cascade(query)?;
         let semantic_atoms = self.semantic_atoms_for_cue(query)?;
+
+        // Phase 9 — goal-biased reweighting. When `goal_bias_weight > 0`,
+        // active goals' HDC signatures up-weight episode matches that are
+        // semantically related to those goals. Attention as a cognitive
+        // function: the agent attends to what it wants.
+        let (goal_biased, active_goal_ids) = if query.goal_bias_weight > 0.0 {
+            self.apply_goal_bias(&mut matches, query.goal_bias_weight)?;
+            let ids: Vec<GoalId> = self
+                .active_goals()?
+                .into_iter()
+                .map(|g| g.id)
+                .collect();
+            (!ids.is_empty(), ids)
+        } else {
+            (false, Vec::new())
+        };
+
+        // Re-sort after biasing and re-apply min_confidence / k.
+        matches.retain(|m| m.confidence >= query.min_confidence);
+        matches.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        matches.truncate(query.k);
+
         let tier_used = matches
             .iter()
             .map(|m| m.source_tier)
@@ -54,9 +81,48 @@ impl Store {
         Ok(Recall {
             matches,
             semantic_atoms,
+            goal_biased,
+            active_goals: active_goal_ids,
             tier_used,
             elapsed_ms,
         })
+    }
+
+    /// Goal-biased reweighting pass (phase 9). For each match, read its
+    /// episode signature and compute the max similarity to any active
+    /// goal's signature, then nudge confidence up by
+    /// `weight * max_goal_sim * (1 - confidence)`. Bias never reduces
+    /// confidence and never exceeds 1.0.
+    fn apply_goal_bias(&self, matches: &mut [RecallMatch], weight: f32) -> Result<()> {
+        let goals = self.active_goals()?;
+        if goals.is_empty() {
+            return Ok(());
+        }
+        let goal_sigs: Vec<HV> = goals
+            .iter()
+            .filter_map(|g| self.signatures.read(g.signature_offset).ok())
+            .collect();
+        if goal_sigs.is_empty() {
+            return Ok(());
+        }
+        for m in matches.iter_mut() {
+            let Ok(ep_sig) = self.signatures.read(
+                // RecallMatch doesn't carry signature_offset; re-read the
+                // episode row to get it. Cheap (one redb get per match).
+                self.get_episode(m.episode_id)?
+                    .map(|e| e.signature_offset)
+                    .unwrap_or(0),
+            ) else {
+                continue;
+            };
+            let max_goal_sim = goal_sigs
+                .iter()
+                .map(|gs| ep_sig.similarity(gs))
+                .fold(0.0f32, f32::max);
+            let boost = weight * max_goal_sim * (1.0 - m.confidence);
+            m.confidence = (m.confidence + boost).clamp(0.0, 1.0);
+        }
+        Ok(())
     }
 
     /// Look up every `SemanticAtom` whose anchoring concept matches a
@@ -126,6 +192,10 @@ impl Store {
                 continue;
             };
             for ep in self.recall_exact(cid, query.as_of)? {
+                // Phase 11 — skip tombstoned episodes.
+                if self.is_episode_tombstoned(ep.id)? {
+                    continue;
+                }
                 if seen.insert(ep.id) {
                     out.push(into_match(ep, 1.0, Tier::Exact));
                 }
@@ -155,6 +225,10 @@ impl Store {
                 if !ep.valid_time.contains(t) {
                     continue;
                 }
+            }
+            // Phase 11 — skip tombstoned episodes.
+            if self.is_episode_tombstoned(ep.id)? {
+                continue;
             }
             let gist = encode_gist_signature(&ep.text);
             let sim = query_hv.similarity(&gist);

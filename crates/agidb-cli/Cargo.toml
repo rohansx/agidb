@@ -1,6 +1,6 @@
 [package]
 name = "agidb-cli"
-description = "Command-line interface for agidb (open, observe, recall, consolidate, export, import)."
+description = "Command-line interface for agidb (open, observe, recall, consolidate, export, import, serve)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,9 +14,14 @@ name = "agidb"
 path = "src/main.rs"
 
 [dependencies]
+agidb = { path = "../agidb", version = "0.1.0-dev" }
 agidb-core = { workspace = true }
+agidb-mcp = { path = "../agidb-mcp", version = "0.1.0-dev" }
 agidb-extract = { workspace = true }
 anyhow = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-tokio = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }

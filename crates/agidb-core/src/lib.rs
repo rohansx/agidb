@@ -12,14 +12,19 @@
 //!
 //! See `docs/architecture/` and `docs/phases/` for the build plan.
 
+pub mod belief;
 pub mod consolidate;
 pub mod episode;
 pub mod error;
+pub mod goal;
 pub mod hdc;
+pub mod learning_log;
 pub mod recall;
+pub mod self_model;
 pub mod signatures;
 pub mod store;
 pub mod types;
+pub mod unlearn;
 
 pub use error::{AgidbError, Result};
 pub use types::{Entity, ExtractContext, ExtractedTriple, Extraction, TextExtractor};
