@@ -67,10 +67,16 @@ agidb replaces the six-step pipeline with one local function call, and adds five
 install the CLI with one command — works on linux (x86_64 / aarch64) and macOS (Intel / Apple silicon). no dependencies, ~35 MB, ships with the GLiNER extractor so observe runs out of the box.
 
 ```bash
+# pin a release (recommended for reproducibility)
+curl -fsSL https://github.com/rohansx/agidb/releases/download/v0.1.0-dev.1/install.sh | sh
+
+# or latest from master
 curl -fsSL https://raw.githubusercontent.com/rohansx/agidb/master/install.sh | sh
 ```
 
-the script auto-detects OS + arch, downloads the matching binary from the latest GitHub release, verifies its sha256, and drops it at `/usr/local/bin/agidb` (or `~/.local/bin/agidb` if you don't have write access). pass `--tag v0.1.0-dev.1` to pin a specific version, `--to ~/bin` to choose a different install dir, `--repo rohansx/agidb` for a fork.
+the script auto-detects OS + arch, downloads the matching binary from the latest GitHub release, verifies its sha256 against the published checksums.txt, and drops it at `/usr/local/bin/agidb` (or `~/.local/bin/agidb` if you don't have write access). pass `--tag vX.Y.Z` to pin a specific version (skips the GitHub API lookup), `--to ~/bin` to choose a different install dir, `--repo rohansx/agidb` for a fork.
+
+**why the pinned URL is preferred:** raw.githubusercontent.com serves `master/install.sh` through a CDN that can lag several minutes behind pushes. The release-pinned URL (`/releases/download/vX.Y.Z/install.sh`) is always in sync with the binaries it installs.
 
 verify:
 
