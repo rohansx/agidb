@@ -64,6 +64,25 @@ agidb replaces the six-step pipeline with one local function call, and adds five
 
 ## quickstart
 
+install the CLI with one command — works on linux (x86_64 / aarch64) and macOS (Intel / Apple silicon). no dependencies, ~35 MB, ships with the GLiNER extractor so observe runs out of the box.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rohansx/agidb/master/install.sh | sh
+```
+
+the script auto-detects OS + arch, downloads the matching binary from the latest GitHub release, verifies its sha256, and drops it at `/usr/local/bin/agidb` (or `~/.local/bin/agidb` if you don't have write access). pass `--tag v0.1.0-dev.1` to pin a specific version, `--to ~/bin` to choose a different install dir, `--repo rohansx/agidb` for a fork.
+
+verify:
+
+```bash
+agidb --version                                    # agidb 0.1.0-dev
+agidb observe ./mem.agidb "Sarah recommended Bawri"  # creates ./mem.agidb
+agidb recall  ./mem.agidb "what thai place?"
+agidb stats   ./mem.agidb
+```
+
+rust library users:
+
 ```bash
 cargo add agidb
 ```
@@ -108,7 +127,19 @@ async fn main() -> anyhow::Result<()> {
 The fastest way to see agidb work is the bundled example — it runs the
 "Sarah recommends Bawri" scenario end-to-end (observe → tier-A exact
 recall → sleep-like consolidation mints a semantic atom → atom surfaces
-in recall), fully offline and deterministic:
+in recall), fully offline and deterministic. with the CLI installed:
+
+```bash
+mkdir mem && cd mem
+agidb observe  . "Sarah recommended Bawri in Bandra last weekend"
+agidb observe  . "Sarah said Bawri is a thai restaurant"
+agidb observe  . "Marco asked the team to pick a thai place for dinner"
+agidb recall   . "what thai place did Sarah mention?"
+agidb consolidate .
+agidb stats    .
+```
+
+library users (after `cargo add agidb`):
 
 ```bash
 cargo run --example sarah_bawri
