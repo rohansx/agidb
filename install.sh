@@ -123,7 +123,17 @@ curl -fsSL -o "${WORK}/checksums.txt" "${BASE}/checksums.txt" \
   || die "checksums download failed"
 
 log "verifying sha256 …"
-EXPECTED=$(awk -v a="${ASSET}" '$2 == a || $2 == "./"a {print $1}' "${WORK}/checksums.txt")
+# checksums.txt format is "<sha>   <basename>" (optionally with a
+# path prefix from the workflow's `find`). Compare on basename only.
+EXPECTED=$(awk -v a="${ASSET}" '
+  {
+    # field 2 may be "agidb-...", "./agidb-...", or
+    # "artifacts/agidb-...". Take the last path component.
+    n = split($2, parts, "/")
+    base = parts[n]
+    if (base == a) print $1
+  }
+' "${WORK}/checksums.txt")
 [ -n "$EXPECTED" ] || die "no checksum found for ${ASSET} in checksums.txt"
 
 cd "${WORK}"

@@ -113,7 +113,12 @@ jobs:
       - name: generate checksums.txt
         working-directory: artifacts
         run: |
-          (cd .. && find artifacts -type f \( -name '*.tar.gz' \) -print0 | xargs -0 sha256sum) > checksums.txt
+          # Emit `<sha>   <basename>` lines (no path prefix), which is
+          # the format install.sh's awk filter expects.
+          find . -type f -name '*.tar.gz' -exec sha256sum {} \; \
+            | awk '{print $1, substr($0, length($1)+2)}' \
+            | sed 's|^\./||; s|^[^/]*/||' \
+            > checksums.txt
           cat checksums.txt
 
       - name: publish GitHub release
