@@ -37,10 +37,8 @@ jobs:
             arch: aarch64
             archive: tar.gz
             cross: true
-            # `main` ships gcc 9 / glibc 2.31 — too old to link
-            # onnxruntime's absl::inlined_vector_storage. bookworm is
-            # gcc 12 / glibc 2.36 which matches what ort-sys expects.
-            cross_image: ghcr.io/cross-rs/aarch64-unknown-linux-gnu:bookworm
+            # image override is in Cross.toml (the CROSS_IMAGE env
+            # var alone is ignored by cross-rs 0.2.5).
           # macOS — Intel + Apple silicon
           - target: x86_64-apple-darwin
             os: macos-14
@@ -70,7 +68,7 @@ jobs:
       - name: build agidb-cli (release, stripped)
         run: |
           if [ "${{ matrix.cross }}" = "true" ]; then
-            CROSS_IMAGE="${{ matrix.cross_image }}" cross build --release --target ${{ matrix.target }} -p agidb-cli --bin agidb
+            cross build --release --target ${{ matrix.target }} -p agidb-cli --bin agidb
           else
             cargo build --release --target ${{ matrix.target }} -p agidb-cli --bin agidb
           fi
