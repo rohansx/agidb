@@ -115,11 +115,13 @@ jobs:
       - name: generate checksums.txt
         working-directory: artifacts
         run: |
-          # Emit `<sha>   <basename>` lines (no path prefix), which is
-          # the format install.sh's awk filter expects.
+          # Emit `<sha>   <basename>` lines (no path prefix). The awk
+          # pulls the hash and the file portion back out separately;
+          # the sed then strips the leading "./" from each path so
+          # downstream tools can match on basename alone.
           find . -type f -name '*.tar.gz' -exec sha256sum {} \; \
-            | awk '{print $1, substr($0, length($1)+2)}' \
-            | sed 's|^\./||; s|^[^/]*/||' \
+            | awk '{print $1, $2}' \
+            | sed 's|^\./||' \
             > checksums.txt
           cat checksums.txt
 
