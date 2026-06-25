@@ -102,6 +102,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -127,7 +129,7 @@ jobs:
           files: |
             artifacts/**/*.tar.gz
             artifacts/checksums.txt
-            ${{ github.workspace }}/install.sh
+            install.sh
           generate_release_notes: true
           draft: true            # leave draft so we can sanity-check before publishing
           fail_on_unmatched_files: true
