@@ -30,8 +30,15 @@ const KEY_NEXT_LEARNING_EVENT_ID: &str = "next_learning_event_id";
 /// implication) — new variants require an ADR.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum LearningEvent {
-    EpisodeStored { id: EpisodeId, at: DateTime<Utc> },
-    GoalSet { id: GoalId, description: String, at: DateTime<Utc> },
+    EpisodeStored {
+        id: EpisodeId,
+        at: DateTime<Utc>,
+    },
+    GoalSet {
+        id: GoalId,
+        description: String,
+        at: DateTime<Utc>,
+    },
     GoalStateChanged {
         id: GoalId,
         from: String,
@@ -51,13 +58,20 @@ pub enum LearningEvent {
         reason: String,
         at: DateTime<Utc>,
     },
-    BeliefWithdrawn { id: BeliefId, reason: String, at: DateTime<Utc> },
+    BeliefWithdrawn {
+        id: BeliefId,
+        reason: String,
+        at: DateTime<Utc>,
+    },
     SemanticAtomFormed {
         atom_id: SemanticAtomId,
         evidence_count: u32,
         at: DateTime<Utc>,
     },
-    ContradictionDetected { count: u32, at: DateTime<Utc> },
+    ContradictionDetected {
+        count: u32,
+        at: DateTime<Utc>,
+    },
     ConsolidationRun {
         atoms_created: u32,
         contradictions: u32,
@@ -70,7 +84,10 @@ pub enum LearningEvent {
         reason: String,
         at: DateTime<Utc>,
     },
-    SelfVectorUpdated { drift_hamming: u32, at: DateTime<Utc> },
+    SelfVectorUpdated {
+        drift_hamming: u32,
+        at: DateTime<Utc>,
+    },
 }
 
 impl LearningEvent {

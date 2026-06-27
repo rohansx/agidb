@@ -82,9 +82,10 @@ impl TextExtractor for DemoExtractor {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let dir = tempfile::tempdir()?;
-    let cfg = AgidbConfig::new(dir.path()).with_extractor(ExtractorSetup::Custom(
-        Arc::new(DemoExtractor) as Arc<dyn TextExtractor + Send + Sync>,
-    ));
+    let cfg = AgidbConfig::new(dir.path())
+        .with_extractor(ExtractorSetup::Custom(
+            Arc::new(DemoExtractor) as Arc<dyn TextExtractor + Send + Sync>
+        ));
     let db = Agidb::open_with(cfg).await?;
 
     println!("============================================================");
@@ -115,7 +116,10 @@ async fn main() -> anyhow::Result<()> {
     let goal_id = db
         .set_goal(Goal::new("find a thai place for the team dinner"))
         .await?;
-    println!("   goal{} active — will bias recall toward thai-related matches", goal_id.raw());
+    println!(
+        "   goal{} active — will bias recall toward thai-related matches",
+        goal_id.raw()
+    );
     println!();
 
     // ---- Floor 6 — belief ----------------------------------------------
@@ -129,34 +133,51 @@ async fn main() -> anyhow::Result<()> {
         )
         .await?;
     let b = db.get_belief(belief_id).await?.unwrap();
-    println!("   belief{} confidence={:.2} evidence={:?}", belief_id.raw(), b.confidence,
-        b.evidence.iter().map(|e| e.raw()).collect::<Vec<_>>());
+    println!(
+        "   belief{} confidence={:.2} evidence={:?}",
+        belief_id.raw(),
+        b.confidence,
+        b.evidence.iter().map(|e| e.raw()).collect::<Vec<_>>()
+    );
     println!();
 
     // ---- Layer 1 — tiered recall (cue-driven) --------------------------
     let cue = "what thai place did Sarah mention?";
     println!("→ recall(\"{cue}\")  [cue-driven, no goal bias]");
     let r = db.recall_cue(cue).await?;
-    println!("   tier_used: {:?}  elapsed_ms: {}", r.tier_used, r.elapsed_ms);
+    println!(
+        "   tier_used: {:?}  elapsed_ms: {}",
+        r.tier_used, r.elapsed_ms
+    );
     for m in &r.matches {
-        println!("   [{:.2}] ep{} ({:?}) {}", m.confidence, m.episode_id.raw(), m.source_tier, m.text);
+        println!(
+            "   [{:.2}] ep{} ({:?}) {}",
+            m.confidence,
+            m.episode_id.raw(),
+            m.source_tier,
+            m.text
+        );
     }
     println!();
 
     // ---- Layer 1 — goal-biased recall (the payoff) ---------------------
     println!("→ recall(\"{cue}\")  [goal-biased, weight=0.3]");
-    let r2 = db
-        .recall(
-            Query::cue(cue)
-                .with_goal_bias(0.3),
-        )
-        .await?;
-    println!("   tier_used: {:?}  goal_biased={}  active_goals={:?}  elapsed_ms={}",
-        r2.tier_used, r2.goal_biased,
+    let r2 = db.recall(Query::cue(cue).with_goal_bias(0.3)).await?;
+    println!(
+        "   tier_used: {:?}  goal_biased={}  active_goals={:?}  elapsed_ms={}",
+        r2.tier_used,
+        r2.goal_biased,
         r2.active_goals.iter().map(|g| g.raw()).collect::<Vec<_>>(),
-        r2.elapsed_ms);
+        r2.elapsed_ms
+    );
     for m in &r2.matches {
-        println!("   [{:.2}] ep{} ({:?}) {}", m.confidence, m.episode_id.raw(), m.source_tier, m.text);
+        println!(
+            "   [{:.2}] ep{} ({:?}) {}",
+            m.confidence,
+            m.episode_id.raw(),
+            m.source_tier,
+            m.text
+        );
     }
     println!("   (thai-related matches are up-weighted by the active goal's signature)");
     println!();
@@ -175,7 +196,10 @@ async fn main() -> anyhow::Result<()> {
     let contra_id = db
         .observe("Sarah said she dislikes thai food actually")
         .await?;
-    println!("   stored episode {} — contradicting evidence", contra_id.raw());
+    println!(
+        "   stored episode {} — contradicting evidence",
+        contra_id.raw()
+    );
     let report = db
         .revise_belief(
             belief_id,
@@ -189,12 +213,19 @@ async fn main() -> anyhow::Result<()> {
         belief_id.raw(),
         report.previous_confidence,
         report.new_confidence,
-        if report.withdrawn { " → WITHDRAWN" } else { "" },
+        if report.withdrawn {
+            " → WITHDRAWN"
+        } else {
+            ""
+        },
     );
     println!();
 
     // ---- Floor 6 — belief history (introspection) ----------------------
-    println!("→ belief_history({}) — replay the revision log", belief_id.raw());
+    println!(
+        "→ belief_history({}) — replay the revision log",
+        belief_id.raw()
+    );
     let hist = db.belief_history(belief_id).await?;
     for (i, r) in hist.iter().enumerate() {
         println!(
@@ -208,8 +239,18 @@ async fn main() -> anyhow::Result<()> {
     let beliefs = db.what_do_i_believe("Sarah").await?;
     println!("→ what_do_i_believe(\"Sarah\")");
     for b in &beliefs {
-        let state = if b.is_withdrawn() { "withdrawn" } else { "active" };
-        println!("   belief{} [{:.2}] {} — {}", b.id.raw(), b.confidence, state, b.claim);
+        let state = if b.is_withdrawn() {
+            "withdrawn"
+        } else {
+            "active"
+        };
+        println!(
+            "   belief{} [{:.2}] {} — {}",
+            b.id.raw(),
+            b.confidence,
+            state,
+            b.claim
+        );
     }
     println!();
 
@@ -223,8 +264,10 @@ async fn main() -> anyhow::Result<()> {
     // ---- introspection via stats ---------------------------------------
     let s = db.stats().await?;
     println!("→ stats()");
-    println!("   episodes={}, concepts={}, atoms={}, goals={}, beliefs={}, signatures={}",
-        s.episodes, s.concepts, s.semantic_atoms, s.goals, s.beliefs, s.signatures);
+    println!(
+        "   episodes={}, concepts={}, atoms={}, goals={}, beliefs={}, signatures={}",
+        s.episodes, s.concepts, s.semantic_atoms, s.goals, s.beliefs, s.signatures
+    );
     println!();
 
     // ---- Floor 7 — what did I learn? (introspection) -------------------
@@ -234,16 +277,57 @@ async fn main() -> anyhow::Result<()> {
         println!("   [{}] {}", e.kind_label(), {
             match e {
                 agidb::LearningEvent::EpisodeStored { id, .. } => format!("episode {}", id.raw()),
-                agidb::LearningEvent::GoalSet { id, description, .. } => format!("goal{} — {}", id.raw(), description),
-                agidb::LearningEvent::GoalStateChanged { id, from, to, .. } => format!("goal{} {} → {}", id.raw(), from, to),
-                agidb::LearningEvent::BeliefAsserted { id, claim, confidence, .. } => format!("belief{} [{:.2}] — {}", id.raw(), confidence, claim),
-                agidb::LearningEvent::BeliefRevised { id, previous_confidence, new_confidence, .. } => format!("belief{} {:.2} → {:.2}", id.raw(), previous_confidence, new_confidence),
-                agidb::LearningEvent::BeliefWithdrawn { id, reason, .. } => format!("belief{} — {}", id.raw(), reason),
-                agidb::LearningEvent::SemanticAtomFormed { atom_id, evidence_count, .. } => format!("atom{} (evidence={})", atom_id.raw(), evidence_count),
-                agidb::LearningEvent::ConsolidationRun { atoms_created, contradictions, .. } => format!("atoms={}, contradictions={}", atoms_created, contradictions),
-                agidb::LearningEvent::Unlearned { target, cascade_size, self_vector_drift, .. } => format!("target={}, cascade={}, sv_drift={}", target, cascade_size, self_vector_drift),
-                agidb::LearningEvent::SelfVectorUpdated { drift_hamming, .. } => format!("drift={}", drift_hamming),
-                agidb::LearningEvent::ContradictionDetected { count, .. } => format!("{} contradictions", count),
+                agidb::LearningEvent::GoalSet {
+                    id, description, ..
+                } => format!("goal{} — {}", id.raw(), description),
+                agidb::LearningEvent::GoalStateChanged { id, from, to, .. } => {
+                    format!("goal{} {} → {}", id.raw(), from, to)
+                }
+                agidb::LearningEvent::BeliefAsserted {
+                    id,
+                    claim,
+                    confidence,
+                    ..
+                } => format!("belief{} [{:.2}] — {}", id.raw(), confidence, claim),
+                agidb::LearningEvent::BeliefRevised {
+                    id,
+                    previous_confidence,
+                    new_confidence,
+                    ..
+                } => format!(
+                    "belief{} {:.2} → {:.2}",
+                    id.raw(),
+                    previous_confidence,
+                    new_confidence
+                ),
+                agidb::LearningEvent::BeliefWithdrawn { id, reason, .. } => {
+                    format!("belief{} — {}", id.raw(), reason)
+                }
+                agidb::LearningEvent::SemanticAtomFormed {
+                    atom_id,
+                    evidence_count,
+                    ..
+                } => format!("atom{} (evidence={})", atom_id.raw(), evidence_count),
+                agidb::LearningEvent::ConsolidationRun {
+                    atoms_created,
+                    contradictions,
+                    ..
+                } => format!("atoms={}, contradictions={}", atoms_created, contradictions),
+                agidb::LearningEvent::Unlearned {
+                    target,
+                    cascade_size,
+                    self_vector_drift,
+                    ..
+                } => format!(
+                    "target={}, cascade={}, sv_drift={}",
+                    target, cascade_size, self_vector_drift
+                ),
+                agidb::LearningEvent::SelfVectorUpdated { drift_hamming, .. } => {
+                    format!("drift={}", drift_hamming)
+                }
+                agidb::LearningEvent::ContradictionDetected { count, .. } => {
+                    format!("{} contradictions", count)
+                }
             }
         });
     }
@@ -252,7 +336,10 @@ async fn main() -> anyhow::Result<()> {
     // ---- Floor 7 — self-vector -----------------------------------------
     let sv = db.self_vector().await?;
     let weight: u32 = (0..1024).map(|i| sv.0[i].count_ones()).sum();
-    println!("→ self_vector() — hamming weight {}/8192 bits active", weight);
+    println!(
+        "→ self_vector() — hamming weight {}/8192 bits active",
+        weight
+    );
     println!();
 
     // ---- Phase 11 — unlearn (forget Sarah) -----------------------------
@@ -262,7 +349,9 @@ async fn main() -> anyhow::Result<()> {
     let sarah_ep = sarah_eps.matches.first().expect("sarah episode exists");
     let sarah_concept = {
         // Look up the concept by name via a recall query
-        let concepts = sarah_ep.triples.iter()
+        let concepts = sarah_ep
+            .triples
+            .iter()
             .find(|t| t.subject == "Sarah")
             .map(|t| t.subject.clone());
         concepts
@@ -272,12 +361,23 @@ async fn main() -> anyhow::Result<()> {
     if let Some(_name) = sarah_concept {
         // Unlearn by source "user" — forgets all user-provided observations.
         let report = db
-            .unlearn(agidb::UnlearnTarget::BySource("user".into()), "user requested forget")
+            .unlearn(
+                agidb::UnlearnTarget::BySource("user".into()),
+                "user requested forget",
+            )
             .await?;
-        println!("   unlearned: episodes={}, beliefs_revised={}, sv_drift={}",
-            report.episodes_removed, report.beliefs_revised, report.self_vector_drift_hamming);
-        println!("   audit_event_id={} (permanent — survives compaction)", report.audit_event_id);
-        println!("   tombstone_expiry={}", report.tombstone_expiry.to_rfc3339());
+        println!(
+            "   unlearned: episodes={}, beliefs_revised={}, sv_drift={}",
+            report.episodes_removed, report.beliefs_revised, report.self_vector_drift_hamming
+        );
+        println!(
+            "   audit_event_id={} (permanent — survives compaction)",
+            report.audit_event_id
+        );
+        println!(
+            "   tombstone_expiry={}",
+            report.tombstone_expiry.to_rfc3339()
+        );
     }
     println!();
 
@@ -288,7 +388,13 @@ async fn main() -> anyhow::Result<()> {
         println!("   (no matches — all Sarah episodes tombstoned, constitution article VI satisfied by tier-floor)");
     } else {
         for m in &r3.matches {
-            println!("   [{:.2}] ep{} ({:?}) {}", m.confidence, m.episode_id.raw(), m.source_tier, m.text);
+            println!(
+                "   [{:.2}] ep{} ({:?}) {}",
+                m.confidence,
+                m.episode_id.raw(),
+                m.source_tier,
+                m.text
+            );
         }
     }
     println!();
@@ -296,7 +402,10 @@ async fn main() -> anyhow::Result<()> {
     // ---- self-vector after unlearn -------------------------------------
     let sv_after = db.self_vector().await?;
     let weight_after: u32 = (0..1024).map(|i| sv_after.0[i].count_ones()).sum();
-    println!("→ self_vector() after unlearn — hamming weight {}/8192 (was {})", weight_after, weight);
+    println!(
+        "→ self_vector() after unlearn — hamming weight {}/8192 (was {})",
+        weight_after, weight
+    );
     println!("   (the self-model no longer contains the unlearned content)");
     println!();
 

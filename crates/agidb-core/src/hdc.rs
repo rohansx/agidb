@@ -36,7 +36,9 @@ impl serde::Serialize for HV {
 }
 
 impl<'de> serde::Deserialize<'de> for HV {
-    fn deserialize<Dser: serde::Deserializer<'de>>(d: Dser) -> std::result::Result<Self, Dser::Error> {
+    fn deserialize<Dser: serde::Deserializer<'de>>(
+        d: Dser,
+    ) -> std::result::Result<Self, Dser::Error> {
         let v: Vec<u8> = serde::Deserialize::deserialize(d)?;
         if v.len() != D_BYTES {
             return Err(serde::de::Error::custom(format!(

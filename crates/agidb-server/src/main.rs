@@ -72,8 +72,8 @@ async fn main() -> Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
-    let db_path = std::env::var("AGIDB_DB_PATH")
-        .unwrap_or_else(|_| "./agidb-demo-data".to_string());
+    let db_path =
+        std::env::var("AGIDB_DB_PATH").unwrap_or_else(|_| "./agidb-demo-data".to_string());
     let bind: SocketAddr = std::env::var("AGIDB_BIND")
         .unwrap_or_else(|_| "127.0.0.1:8765".to_string())
         .parse()
@@ -85,7 +85,7 @@ async fn main() -> Result<()> {
     // (downloads ~250MB on first call). The /demo page uses
     // text-only observations so tier-C gist recall still works.
     let use_null = std::env::var("AGIDB_NULL_EXTRACTOR")
-        .map(|v| v != "0" && v.to_ascii_lowercase() != "false")
+        .map(|v| v != "0" && !v.eq_ignore_ascii_case("false"))
         .unwrap_or(true);
 
     let ctx = if use_null {
@@ -161,10 +161,7 @@ async fn list_tools(State(state): State<AppState>) -> impl IntoResponse {
     }))
 }
 
-async fn ws_upgrade(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+async fn ws_upgrade(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| ws_loop(socket, state))
 }
 

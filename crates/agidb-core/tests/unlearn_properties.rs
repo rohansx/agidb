@@ -58,8 +58,12 @@ fn observe_emits_episode_stored_event() {
     let _ = observe_triple(&mut store, 1, "Sarah", "likes", "thai");
 
     let events = store.all_learning_events().expect("events");
-    assert!(events.iter().any(|e| matches!(e, LearningEvent::EpisodeStored { id, .. } if id.raw() == 1)),
-        "observe must emit EpisodeStored");
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, LearningEvent::EpisodeStored { id, .. } if id.raw() == 1)),
+        "observe must emit EpisodeStored"
+    );
 }
 
 #[test]
@@ -70,9 +74,13 @@ fn what_did_i_learn_filters_by_time() {
     let _ = observe_triple(&mut store, 2, "B", "is", "B");
 
     let since = store.what_did_i_learn(before).expect("learn");
-    assert!(since.iter().all(|e| e.timestamp() >= before),
-        "what_did_i_learn must only return events after the cutoff");
-    assert!(since.iter().any(|e| matches!(e, LearningEvent::EpisodeStored { id, .. } if id.raw() == 2)));
+    assert!(
+        since.iter().all(|e| e.timestamp() >= before),
+        "what_did_i_learn must only return events after the cutoff"
+    );
+    assert!(since
+        .iter()
+        .any(|e| matches!(e, LearningEvent::EpisodeStored { id, .. } if id.raw() == 2)));
 }
 
 #[test]
@@ -81,15 +89,27 @@ fn goal_and_belief_ops_emit_learning_events() {
     let gid = store.set_goal(Goal::new("test goal")).expect("set");
     store.complete_goal(gid, vec![]).expect("complete");
     let bid = store
-        .assert_belief(Belief::new("test belief").with_triple("X", "is", "Y").with_confidence(0.7))
+        .assert_belief(
+            Belief::new("test belief")
+                .with_triple("X", "is", "Y")
+                .with_confidence(0.7),
+        )
         .expect("assert");
     store.withdraw_belief(bid, "testing").expect("withdraw");
 
     let events = store.all_learning_events().expect("events");
-    assert!(events.iter().any(|e| matches!(e, LearningEvent::GoalSet { .. })));
-    assert!(events.iter().any(|e| matches!(e, LearningEvent::GoalStateChanged { to, .. } if to == "Completed")));
-    assert!(events.iter().any(|e| matches!(e, LearningEvent::BeliefAsserted { .. })));
-    assert!(events.iter().any(|e| matches!(e, LearningEvent::BeliefWithdrawn { .. })));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, LearningEvent::GoalSet { .. })));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, LearningEvent::GoalStateChanged { to, .. } if to == "Completed")));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, LearningEvent::BeliefAsserted { .. })));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, LearningEvent::BeliefWithdrawn { .. })));
 }
 
 // ---------------------------------------------------------------------------
@@ -100,7 +120,11 @@ fn goal_and_belief_ops_emit_learning_events() {
 fn self_vector_starts_zero_and_drifts_on_consolidate() {
     let (mut store, _d) = fresh_store();
     let sv0 = store.self_vector().expect("sv");
-    assert_eq!(sv0.hamming(&HV([0u8; 1024])), 0, "fresh self-vector is zero");
+    assert_eq!(
+        sv0.hamming(&HV([0u8; 1024])),
+        0,
+        "fresh self-vector is zero"
+    );
 
     // Observe 3 identical episodes → consolidate mints an atom →
     // self-vector should drift away from zero.
@@ -109,7 +133,10 @@ fn self_vector_starts_zero_and_drifts_on_consolidate() {
     }
     store.consolidate().expect("consolidate");
     let sv1 = store.self_vector().expect("sv");
-    assert!(sv1.hamming(&HV([0u8; 1024])) > 0, "self-vector must drift after consolidation");
+    assert!(
+        sv1.hamming(&HV([0u8; 1024])) > 0,
+        "self-vector must drift after consolidation"
+    );
 }
 
 #[test]
@@ -120,7 +147,10 @@ fn self_vector_history_snapshots_are_retrievable() {
     }
     store.consolidate().expect("consolidate");
     let hist = store.self_vector_history().expect("history");
-    assert!(!hist.is_empty(), "consolidation must snapshot the self-vector");
+    assert!(
+        !hist.is_empty(),
+        "consolidation must snapshot the self-vector"
+    );
 }
 
 #[test]
@@ -132,7 +162,10 @@ fn hv_ema_update_moves_toward_bundle() {
     // the original was.
     let sim_before = current.similarity(&bundle);
     let sim_after = updated.similarity(&bundle);
-    assert!(sim_after > sim_before, "EMA must move toward bundle: {sim_before} → {sim_after}");
+    assert!(
+        sim_after > sim_before,
+        "EMA must move toward bundle: {sim_before} → {sim_after}"
+    );
 }
 
 #[test]
@@ -143,7 +176,10 @@ fn hv_subtract_removes_alignment() {
     let sim_after_add = combined.similarity(&addition);
     let subtracted = hv_subtract(&combined, &addition);
     let sim_after_sub = subtracted.similarity(&addition);
-    assert!(sim_after_sub < sim_after_add, "subtract must reduce alignment: {sim_after_add} → {sim_after_sub}");
+    assert!(
+        sim_after_sub < sim_after_add,
+        "subtract must reduce alignment: {sim_after_add} → {sim_after_sub}"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -168,13 +204,19 @@ fn unlearn_episode_tombstones_it_and_excludes_from_recall() {
 
     // Episode 1 is excluded from recall.
     let r = store.recall(&Query::cue("Sarah")).expect("recall");
-    assert!(!r.matches.iter().any(|m| m.episode_id.raw() == 1),
-        "tombstoned episode must not appear in recall");
+    assert!(
+        !r.matches.iter().any(|m| m.episode_id.raw() == 1),
+        "tombstoned episode must not appear in recall"
+    );
 
     // The audit event is permanent.
     let events = store.all_learning_events().expect("events");
-    assert!(events.iter().any(|e| matches!(e, LearningEvent::Unlearned { target, .. } if target.contains("episode:1"))),
-        "Unlearned event must be in the audit log");
+    assert!(
+        events.iter().any(
+            |e| matches!(e, LearningEvent::Unlearned { target, .. } if target.contains("episode:1"))
+        ),
+        "Unlearned event must be in the audit log"
+    );
 }
 
 #[test]
@@ -195,24 +237,38 @@ fn unlearn_concept_cascades_to_episodes_and_beliefs() {
         .expect("assert");
 
     // Find Sarah's concept id.
-    let cid = store.concept_id_for("Sarah").expect("lookup").expect("exists");
+    let cid = store
+        .concept_id_for("Sarah")
+        .expect("lookup")
+        .expect("exists");
 
     // Unlearn the concept.
     let report = store
         .unlearn(UnlearnTarget::Concept(cid), "GDPR forget request")
         .expect("unlearn");
-    assert!(report.episodes_removed >= 2, "should tombstone Sarah's episodes: got {}", report.episodes_removed);
-    assert!(report.beliefs_removed + report.beliefs_revised >= 1, "belief about Sarah should be affected");
+    assert!(
+        report.episodes_removed >= 2,
+        "should tombstone Sarah's episodes: got {}",
+        report.episodes_removed
+    );
+    assert!(
+        report.beliefs_removed + report.beliefs_revised >= 1,
+        "belief about Sarah should be affected"
+    );
 
     // Sarah is gone from recall.
     let r = store.recall(&Query::cue("Sarah")).expect("recall");
-    assert!(!r.matches.iter().any(|m| m.text.contains("Sarah")),
-        "no Sarah episodes after unlearn concept");
+    assert!(
+        !r.matches.iter().any(|m| m.text.contains("Sarah")),
+        "no Sarah episodes after unlearn concept"
+    );
 
     // Marco is still there.
     let r = store.recall(&Query::cue("Marco")).expect("recall");
-    assert!(r.matches.iter().any(|m| m.text.contains("Marco")),
-        "unrelated episodes must survive concept unlearn");
+    assert!(
+        r.matches.iter().any(|m| m.text.contains("Marco")),
+        "unrelated episodes must survive concept unlearn"
+    );
 }
 
 #[test]
@@ -225,16 +281,26 @@ fn unlearn_subtracts_from_self_vector() {
     let sv_before = store.self_vector().expect("sv");
 
     // Get Sarah's concept sig for verification.
-    let cid = store.concept_id_for("Sarah").expect("lookup").expect("exists");
+    let cid = store
+        .concept_id_for("Sarah")
+        .expect("lookup")
+        .expect("exists");
     let _ = cid;
 
     let report = store
         .unlearn(UnlearnTarget::Concept(cid), "forget Sarah")
         .expect("unlearn");
-    assert!(report.self_vector_drift_hamming > 0, "self-vector must drift on unlearn");
+    assert!(
+        report.self_vector_drift_hamming > 0,
+        "self-vector must drift on unlearn"
+    );
 
     let sv_after = store.self_vector().expect("sv");
-    assert_ne!(sv_before.hamming(&sv_after), 0, "self-vector must change after unlearn");
+    assert_ne!(
+        sv_before.hamming(&sv_after),
+        0,
+        "self-vector must change after unlearn"
+    );
 }
 
 #[test]
@@ -268,7 +334,10 @@ fn unlearn_by_source_gdpr_article_17() {
     observe_triple(&mut store, 2, "Marco", "likes", "go");
 
     let report = store
-        .unlearn(UnlearnTarget::BySource("tool:gmail".into()), "GDPR Article 17")
+        .unlearn(
+            UnlearnTarget::BySource("tool:gmail".into()),
+            "GDPR Article 17",
+        )
         .expect("unlearn");
     assert_eq!(report.episodes_removed, 1);
     assert_eq!(report.reason, "GDPR Article 17");
@@ -288,19 +357,23 @@ fn restore_within_window_reverses_tombstone() {
     let report = store
         .unlearn(UnlearnTarget::Episode(EpisodeId::new(1)), "mistake")
         .expect("unlearn");
-    
+
     // Episode is excluded.
     let r = store.recall(&Query::cue("Sarah")).expect("recall");
     assert!(!r.matches.iter().any(|m| m.episode_id.raw() == 1));
 
     // Restore within the window.
-    let restored = store.restore_within_window(report.audit_event_id).expect("restore");
+    let restored = store
+        .restore_within_window(report.audit_event_id)
+        .expect("restore");
     assert_eq!(restored, 1, "should restore 1 tombstone");
 
     // Episode is back.
     let r = store.recall(&Query::cue("Sarah")).expect("recall");
-    assert!(r.matches.iter().any(|m| m.episode_id.raw() == 1),
-        "restored episode must reappear in recall");
+    assert!(
+        r.matches.iter().any(|m| m.episode_id.raw() == 1),
+        "restored episode must reappear in recall"
+    );
 }
 
 #[test]
@@ -313,15 +386,23 @@ fn unlearn_audit_log_is_permanent() {
 
     // The Unlearned event survives — it's in the learning log.
     let events = store.all_learning_events().expect("events");
-    let unlearned = events.iter().find(|e| matches!(e, LearningEvent::Unlearned { .. }));
+    let unlearned = events
+        .iter()
+        .find(|e| matches!(e, LearningEvent::Unlearned { .. }));
     assert!(unlearned.is_some(), "Unlearned event must be permanent");
 
     // Even after restore, the audit event persists (restore only
     // removes the tombstone, not the audit record).
-    store.restore_within_window(report.audit_event_id).expect("restore");
+    store
+        .restore_within_window(report.audit_event_id)
+        .expect("restore");
     let events = store.all_learning_events().expect("events");
-    assert!(events.iter().any(|e| matches!(e, LearningEvent::Unlearned { .. })),
-        "Unlearned audit record must persist after restore");
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, LearningEvent::Unlearned { .. })),
+        "Unlearned audit record must persist after restore"
+    );
 }
 
 #[test]
@@ -344,11 +425,20 @@ fn unlearn_cascade_corrects_beliefs_with_tombstoned_evidence() {
     let report = store
         .unlearn(UnlearnTarget::Episode(EpisodeId::new(1)), "test")
         .expect("unlearn");
-    assert!(report.beliefs_revised > 0, "belief with tombstoned evidence should be revised");
+    assert!(
+        report.beliefs_revised > 0,
+        "belief with tombstoned evidence should be revised"
+    );
 
     let after = store.get_belief(bid).unwrap().unwrap();
-    assert!(!after.evidence.contains(&EpisodeId::new(1)), "tombstoned evidence must be removed");
-    assert!(after.confidence < before.confidence, "confidence must drop with less evidence");
+    assert!(
+        !after.evidence.contains(&EpisodeId::new(1)),
+        "tombstoned evidence must be removed"
+    );
+    assert!(
+        after.confidence < before.confidence,
+        "confidence must drop with less evidence"
+    );
 }
 
 #[test]

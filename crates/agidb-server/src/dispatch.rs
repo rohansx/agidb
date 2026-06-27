@@ -3,9 +3,7 @@
 //! pure + blocking, so we drive it from inside `spawn_blocking` to
 //! keep the tokio runtime responsive.
 
-use agidb_mcp::protocol::{
-    error_code, JsonRpcRequest, JsonRpcResponse,
-};
+use agidb_mcp::protocol::{error_code, JsonRpcRequest, JsonRpcResponse};
 use serde_json::{json, Value};
 
 use crate::AppState;
@@ -42,7 +40,11 @@ pub async fn handle_ws_frame(state: &AppState, raw: &str) -> Option<JsonRpcRespo
         .ok()
         .flatten();
 
-    if is_notification { None } else { resp }
+    if is_notification {
+        None
+    } else {
+        resp
+    }
 }
 
 /// Best-effort `id` extractor for parse-error responses.
@@ -60,14 +62,17 @@ fn extract_id(raw: &str) -> Option<Value> {
 #[allow(dead_code)] // consumed by the landing page's JS (server-side helpers)
 pub fn phase_aliases() -> [(&'static str, &'static [&'static str]); 8] {
     [
-        ("observe",        &["observe"]),
-        ("set_goal",       &["set_goal", "goal"]),
-        ("assert_belief",  &["assert_belief", "belief"]),
-        ("recall",         &["recall"]),
-        ("consolidate",    &["consolidate", "sleep"]),
-        ("revise_belief",  &["revise_belief", "revise", "what_do_i_believe"]),
-        ("stats",          &["stats", "self_vector"]),
-        ("unlearn",        &["unlearn", "forget sarah"]),
+        ("observe", &["observe"]),
+        ("set_goal", &["set_goal", "goal"]),
+        ("assert_belief", &["assert_belief", "belief"]),
+        ("recall", &["recall"]),
+        ("consolidate", &["consolidate", "sleep"]),
+        (
+            "revise_belief",
+            &["revise_belief", "revise", "what_do_i_believe"],
+        ),
+        ("stats", &["stats", "self_vector"]),
+        ("unlearn", &["unlearn", "forget sarah"]),
     ]
 }
 
@@ -95,14 +100,17 @@ pub fn resolve_phase(q: &str) -> Option<&'static str> {
     }
     // Build the alias → phase map statically (no Value lifetime to fight).
     let aliases: &[(&str, &[&str])] = &[
-        ("observe",        &["observe"]),
-        ("set_goal",       &["set_goal", "goal"]),
-        ("assert_belief",  &["assert_belief", "belief"]),
-        ("recall",         &["recall"]),
-        ("consolidate",    &["consolidate", "sleep"]),
-        ("revise_belief",  &["revise_belief", "revise", "what_do_i_believe"]),
-        ("stats",          &["stats", "self_vector"]),
-        ("unlearn",        &["unlearn", "forget sarah"]),
+        ("observe", &["observe"]),
+        ("set_goal", &["set_goal", "goal"]),
+        ("assert_belief", &["assert_belief", "belief"]),
+        ("recall", &["recall"]),
+        ("consolidate", &["consolidate", "sleep"]),
+        (
+            "revise_belief",
+            &["revise_belief", "revise", "what_do_i_believe"],
+        ),
+        ("stats", &["stats", "self_vector"]),
+        ("unlearn", &["unlearn", "forget sarah"]),
     ];
     for (phase, list) in aliases {
         for a in *list {
@@ -115,7 +123,11 @@ pub fn resolve_phase(q: &str) -> Option<&'static str> {
     if q.starts_with("observe") || q.starts_with("remember") || q.starts_with("store") {
         return Some("observe");
     }
-    if q.starts_with("recall") || q.starts_with("search") || q.starts_with("find") || q.starts_with("what") {
+    if q.starts_with("recall")
+        || q.starts_with("search")
+        || q.starts_with("find")
+        || q.starts_with("what")
+    {
         return Some("recall");
     }
     if q.starts_with("forget") || q.starts_with("unlearn") || q.starts_with("delete") {
@@ -184,14 +196,14 @@ pub fn args_for_phase(phase: &str, user_text: Option<&str>) -> Value {
 #[allow(dead_code)] // consumed by the landing page's JS (server-side helpers)
 pub fn tool_for_phase(phase: &str) -> &'static str {
     match phase {
-        "observe"        => "memory_observe",
-        "recall"         => "memory_recall",
-        "consolidate"    => "memory_consolidate",
-        "set_goal"       => "memory_set_goal",
-        "assert_belief"  => "memory_assert_belief",
-        "revise_belief"  => "memory_revise_belief",
-        "stats"          => "memory_stats",
-        "unlearn"        => "memory_unlearn",
+        "observe" => "memory_observe",
+        "recall" => "memory_recall",
+        "consolidate" => "memory_consolidate",
+        "set_goal" => "memory_set_goal",
+        "assert_belief" => "memory_assert_belief",
+        "revise_belief" => "memory_revise_belief",
+        "stats" => "memory_stats",
+        "unlearn" => "memory_unlearn",
         _ => "memory_observe", // safe default for unknown phases
     }
 }
@@ -213,7 +225,10 @@ mod tests {
         // "recall sarah" should resolve to recall (cuing the agent).
         assert_eq!(resolve_phase("recall sarah"), Some("recall"));
         assert_eq!(resolve_phase("forget sarah"), Some("unlearn"));
-        assert_eq!(resolve_phase("observe sarah recommended bawri"), Some("observe"));
+        assert_eq!(
+            resolve_phase("observe sarah recommended bawri"),
+            Some("observe")
+        );
     }
 
     #[test]

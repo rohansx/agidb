@@ -102,7 +102,11 @@ impl Store {
     ///    whose evidence was tombstoned.
     /// 4. Subtract the bundle of tombstoned signatures from the self-vector.
     /// 5. Emit `LearningEvent::Unlearned` (permanent, survives compaction).
-    pub fn unlearn(&mut self, target: UnlearnTarget, reason: impl Into<String>) -> Result<UnlearnReport> {
+    pub fn unlearn(
+        &mut self,
+        target: UnlearnTarget,
+        reason: impl Into<String>,
+    ) -> Result<UnlearnReport> {
         let reason = reason.into();
         let at = Utc::now();
 
@@ -434,7 +438,8 @@ impl Store {
         reason: &str,
         at: DateTime<Utc>,
     ) -> Result<usize> {
-        let ev_set: std::collections::HashSet<EpisodeId> = tombstoned_episodes.iter().copied().collect();
+        let ev_set: std::collections::HashSet<EpisodeId> =
+            tombstoned_episodes.iter().copied().collect();
         let to_fix: Vec<(BeliefId, Belief)> = {
             let tx = self.db.begin_read()?;
             let table = tx.open_table(BELIEFS)?;

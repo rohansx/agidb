@@ -26,7 +26,8 @@ use crate::store::{decode, encode, Store, MANIFEST};
 /// Timestamped snapshots of the self-vector over time. Keyed by a
 /// monotonic seq; the *current* self-vector lives in the manifest for
 /// O(1) access.
-pub const SELF_VECTOR_HISTORY: TableDefinition<u64, Vec<u8>> = TableDefinition::new("self_vector_history");
+pub const SELF_VECTOR_HISTORY: TableDefinition<u64, Vec<u8>> =
+    TableDefinition::new("self_vector_history");
 
 /// Manifest key for the current self-vector (1024 bytes).
 const KEY_SELF_VECTOR: &str = "self_vector";
@@ -59,17 +60,25 @@ pub struct SelfVectorSnapshot {
 pub fn hv_ema_update(current: &HV, bundle: &HV, alpha: f32) -> HV {
     let mut out = [0u8; D / 8];
     let inv = 1.0 - alpha;
-    for i in 0..(D / 8) {
+    for (i, out_byte) in out.iter_mut().enumerate().take(D / 8) {
         let mut byte = 0u8;
         for bit in 0..8 {
-            let old = if (current.0[i] >> bit) & 1 == 1 { 1.0f32 } else { -1.0 };
-            let bun = if (bundle.0[i] >> bit) & 1 == 1 { 1.0f32 } else { -1.0 };
+            let old = if (current.0[i] >> bit) & 1 == 1 {
+                1.0f32
+            } else {
+                -1.0
+            };
+            let bun = if (bundle.0[i] >> bit) & 1 == 1 {
+                1.0f32
+            } else {
+                -1.0
+            };
             let new_val = inv * old + alpha * bun;
             if new_val >= 0.0 {
                 byte |= 1 << bit;
             }
         }
-        out[i] = byte;
+        *out_byte = byte;
     }
     HV(out)
 }
@@ -79,8 +88,8 @@ pub fn hv_ema_update(current: &HV, bundle: &HV, alpha: f32) -> HV {
 /// the unlearned content's alignment.
 pub fn hv_subtract(current: &HV, bundle: &HV) -> HV {
     let mut out = [0u8; D / 8];
-    for i in 0..(D / 8) {
-        out[i] = current.0[i] ^ bundle.0[i];
+    for (i, out_byte) in out.iter_mut().enumerate().take(D / 8) {
+        *out_byte = current.0[i] ^ bundle.0[i];
     }
     HV(out)
 }

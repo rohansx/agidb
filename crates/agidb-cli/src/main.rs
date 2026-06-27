@@ -15,7 +15,7 @@
 use std::path::PathBuf;
 
 use agidb::{Agidb, AgidbConfig, ExtractorSetup, Query, Tier};
-use agidb::{Belief, Goal, GoalId, BeliefId, EpisodeId, ConceptId, UnlearnTarget};
+use agidb::{Belief, BeliefId, ConceptId, EpisodeId, Goal, GoalId, UnlearnTarget};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
@@ -100,9 +100,18 @@ enum Command {
     /// Show one goal.
     GoalGet { db: PathBuf, id: u64 },
     /// Complete a goal with optional evidence episode ids.
-    GoalComplete { db: PathBuf, id: u64, #[arg(long)] evidence: Vec<u64> },
+    GoalComplete {
+        db: PathBuf,
+        id: u64,
+        #[arg(long)]
+        evidence: Vec<u64>,
+    },
     /// Abandon a goal.
-    GoalAbandon { db: PathBuf, id: u64, reason: String },
+    GoalAbandon {
+        db: PathBuf,
+        id: u64,
+        reason: String,
+    },
     // -- beliefs (floor 6) ------------------------------------------------
     /// Assert a belief. Use --subject/--predicate/--object to make it
     /// queryable by subject; --confidence sets the initial grade.
@@ -136,17 +145,33 @@ enum Command {
         reason: String,
     },
     /// Withdraw a belief.
-    BeliefWithdraw { db: PathBuf, id: u64, reason: String },
+    BeliefWithdraw {
+        db: PathBuf,
+        id: u64,
+        reason: String,
+    },
     /// Show the append-only revision history of a belief.
     BeliefHistory { db: PathBuf, id: u64 },
     // -- unlearn (phase 11) -----------------------------------------------
     /// Forget a concept and everything referencing it. Non-destructive
     /// (tombstoned); recoverable within 30 days.
-    UnlearnConcept { db: PathBuf, concept_id: u64, reason: String },
+    UnlearnConcept {
+        db: PathBuf,
+        concept_id: u64,
+        reason: String,
+    },
     /// Forget a single episode.
-    UnlearnEpisode { db: PathBuf, id: u64, reason: String },
+    UnlearnEpisode {
+        db: PathBuf,
+        id: u64,
+        reason: String,
+    },
     /// Forget everything from a source (GDPR Article 17).
-    UnlearnSource { db: PathBuf, source: String, reason: String },
+    UnlearnSource {
+        db: PathBuf,
+        source: String,
+        reason: String,
+    },
     /// Show the unlearn (tombstone) history.
     UnlearnHistory { db: PathBuf },
     /// Restore a tombstoned unlearn within the 30-day window.
@@ -154,7 +179,11 @@ enum Command {
     // -- self-model (phase 10) --------------------------------------------
     /// What did I learn? Prints the learning-event log (optionally since
     /// an ISO-8601 timestamp).
-    WhatDidILearn { db: PathBuf, #[arg(long)] since: Option<String> },
+    WhatDidILearn {
+        db: PathBuf,
+        #[arg(long)]
+        since: Option<String>,
+    },
     /// Show the current self-vector (hamming weight + history count).
     SelfVector { db: PathBuf },
 }
@@ -225,7 +254,10 @@ async fn main() -> Result<()> {
             let r = ag.consolidate().await?;
             println!(
                 "consolidated: scanned={}, atoms_created={}, contradictions={}, elapsed_ms={}",
-                r.episodes_scanned, r.semantic_atoms_created, r.contradictions_detected, r.elapsed_ms,
+                r.episodes_scanned,
+                r.semantic_atoms_created,
+                r.contradictions_detected,
+                r.elapsed_ms,
             );
         }
         Command::Get { db, id } => {
@@ -235,10 +267,17 @@ async fn main() -> Result<()> {
                     println!("episode {}", ep.id);
                     println!("  text: {}", ep.text);
                     println!("  confidence: {:.2}", ep.confidence);
-                    println!("  valid_time: {} ..= {:?}", ep.valid_time.start.to_rfc3339(), ep.valid_time.end.map(|e| e.to_rfc3339()));
+                    println!(
+                        "  valid_time: {} ..= {:?}",
+                        ep.valid_time.start.to_rfc3339(),
+                        ep.valid_time.end.map(|e| e.to_rfc3339())
+                    );
                     println!("  triples ({}):", ep.triples.len());
                     for t in &ep.triples {
-                        println!("    ({:.2}) {} | {} | {}", t.confidence, t.subject, t.predicate, t.object);
+                        println!(
+                            "    ({:.2}) {} | {} | {}",
+                            t.confidence, t.subject, t.predicate, t.object
+                        );
                     }
                     if let Some(sb) = ep.superseded_by {
                         println!("  superseded_by: {}", sb);
@@ -260,7 +299,11 @@ async fn main() -> Result<()> {
             println!("concepts:             {}", s.concepts);
             println!("semantic_atoms:       {}", s.semantic_atoms);
             println!("consolidation_passes: {}", s.consolidation_passes);
-            println!("signatures:           {} ({} bytes)", s.signatures, s.signatures * 1024);
+            println!(
+                "signatures:           {} ({} bytes)",
+                s.signatures,
+                s.signatures * 1024
+            );
         }
         Command::Export { db, file } => {
             let ag = open(&db, true).await?;
@@ -282,32 +325,54 @@ async fn main() -> Result<()> {
             server.run_stdio()?;
         }
         // -- goals ---------------------------------------------------------
-        Command::GoalSet { db, description, offline } => {
+        Command::GoalSet {
+            db,
+            description,
+            offline,
+        } => {
             let ag = open(&db, offline).await?;
             let id = ag.set_goal(Goal::new(&description)).await?;
             println!("set goal {} — {:?}", id.raw(), description);
         }
         Command::GoalList { db, active } => {
             let ag = open(&db, true).await?;
-            let goals = if active { ag.active_goals().await? } else { ag.all_goals().await? };
+            let goals = if active {
+                ag.active_goals().await?
+            } else {
+                ag.all_goals().await?
+            };
             if goals.is_empty() {
                 println!("(no goals)");
             }
             for g in goals {
-                println!("goal{} [{:?}] {}", g.id.raw(), g.state.kind(), g.description);
+                println!(
+                    "goal{} [{:?}] {}",
+                    g.id.raw(),
+                    g.state.kind(),
+                    g.description
+                );
             }
         }
         Command::GoalGet { db, id } => {
             let ag = open(&db, true).await?;
             match ag.get_goal(GoalId::new(id)).await? {
                 Some(g) => {
-                    println!("goal{} [{:?}] {}", g.id.raw(), g.state.kind(), g.description);
+                    println!(
+                        "goal{} [{:?}] {}",
+                        g.id.raw(),
+                        g.state.kind(),
+                        g.description
+                    );
                     if let Some(p) = g.parent_id {
                         println!("  parent: goal{}", p.raw());
                     }
                     for (i, c) in g.success_criteria.iter().enumerate() {
-                        println!("  criterion[{}] {}{}",
-                            i, if c.met { "[met] " } else { "" }, c.description);
+                        println!(
+                            "  criterion[{}] {}{}",
+                            i,
+                            if c.met { "[met] " } else { "" },
+                            c.description
+                        );
                     }
                 }
                 None => println!("goal {} not found", id),
@@ -315,7 +380,11 @@ async fn main() -> Result<()> {
         }
         Command::GoalComplete { db, id, evidence } => {
             let ag = open(&db, true).await?;
-            ag.complete_goal(GoalId::new(id), evidence.into_iter().map(EpisodeId::new).collect()).await?;
+            ag.complete_goal(
+                GoalId::new(id),
+                evidence.into_iter().map(EpisodeId::new).collect(),
+            )
+            .await?;
             println!("completed goal {}", id);
         }
         Command::GoalAbandon { db, id, reason } => {
@@ -324,7 +393,14 @@ async fn main() -> Result<()> {
             println!("abandoned goal {} — {}", id, reason);
         }
         // -- beliefs -------------------------------------------------------
-        Command::BeliefAssert { db, claim, subject, predicate, object, confidence } => {
+        Command::BeliefAssert {
+            db,
+            claim,
+            subject,
+            predicate,
+            object,
+            confidence,
+        } => {
             let ag = open(&db, true).await?;
             let mut b = Belief::new(&claim).with_confidence(confidence);
             if let (Some(s), Some(p), Some(o)) = (subject, predicate, object) {
@@ -344,20 +420,48 @@ async fn main() -> Result<()> {
                 println!("(no beliefs)");
             }
             for b in beliefs {
-                let state = if b.is_withdrawn() { "withdrawn" } else { "active" };
-                println!("belief{} [{:.2}] {} — {}",
-                    b.id.raw(), b.confidence, state, b.claim);
+                let state = if b.is_withdrawn() {
+                    "withdrawn"
+                } else {
+                    "active"
+                };
+                println!(
+                    "belief{} [{:.2}] {} — {}",
+                    b.id.raw(),
+                    b.confidence,
+                    state,
+                    b.claim
+                );
                 if !b.evidence.is_empty() {
-                    println!("  evidence: {:?}", b.evidence.iter().map(|e| e.raw()).collect::<Vec<_>>());
+                    println!(
+                        "  evidence: {:?}",
+                        b.evidence.iter().map(|e| e.raw()).collect::<Vec<_>>()
+                    );
                 }
                 if !b.contradictions.is_empty() {
-                    println!("  contradictions: {:?}", b.contradictions.iter().map(|e| e.raw()).collect::<Vec<_>>());
+                    println!(
+                        "  contradictions: {:?}",
+                        b.contradictions.iter().map(|e| e.raw()).collect::<Vec<_>>()
+                    );
                 }
             }
         }
-        Command::BeliefRevise { db, id, evidence, supports, reason } => {
+        Command::BeliefRevise {
+            db,
+            id,
+            evidence,
+            supports,
+            reason,
+        } => {
             let ag = open(&db, true).await?;
-            let r = ag.revise_belief(BeliefId::new(id), EpisodeId::new(evidence), supports, reason.clone()).await?;
+            let r = ag
+                .revise_belief(
+                    BeliefId::new(id),
+                    EpisodeId::new(evidence),
+                    supports,
+                    reason.clone(),
+                )
+                .await?;
             let verdict = if r.withdrawn { " → WITHDRAWN" } else { "" };
             println!(
                 "revised belief {}: {:.2} → {:.2}{} — {}",
@@ -366,7 +470,8 @@ async fn main() -> Result<()> {
         }
         Command::BeliefWithdraw { db, id, reason } => {
             let ag = open(&db, true).await?;
-            ag.withdraw_belief(BeliefId::new(id), reason.clone()).await?;
+            ag.withdraw_belief(BeliefId::new(id), reason.clone())
+                .await?;
             println!("withdrew belief {} — {}", id, reason);
         }
         Command::BeliefHistory { db, id } => {
@@ -387,20 +492,34 @@ async fn main() -> Result<()> {
             }
         }
         // -- unlearn -------------------------------------------------------
-        Command::UnlearnConcept { db, concept_id, reason } => {
+        Command::UnlearnConcept {
+            db,
+            concept_id,
+            reason,
+        } => {
             let ag = open(&db, true).await?;
-            let report = ag.unlearn(UnlearnTarget::Concept(ConceptId::new(concept_id)), reason.clone()).await?;
+            let report = ag
+                .unlearn(
+                    UnlearnTarget::Concept(ConceptId::new(concept_id)),
+                    reason.clone(),
+                )
+                .await?;
             println!(
                 "unlearned concept {}: episodes={}, beliefs={}, beliefs_revised={}, atoms={}, sv_drift={}, expiry={}",
                 concept_id, report.episodes_removed, report.beliefs_removed,
                 report.beliefs_revised, report.semantic_atoms_affected,
                 report.self_vector_drift_hamming, report.tombstone_expiry.to_rfc3339(),
             );
-            println!("  reason: {}  audit_event_id: {}", reason, report.audit_event_id);
+            println!(
+                "  reason: {}  audit_event_id: {}",
+                reason, report.audit_event_id
+            );
         }
         Command::UnlearnEpisode { db, id, reason } => {
             let ag = open(&db, true).await?;
-            let report = ag.unlearn(UnlearnTarget::Episode(EpisodeId::new(id)), reason.clone()).await?;
+            let report = ag
+                .unlearn(UnlearnTarget::Episode(EpisodeId::new(id)), reason.clone())
+                .await?;
             println!(
                 "unlearned episode {}: beliefs_revised={}, sv_drift={}, audit_event_id: {}",
                 id, report.beliefs_revised, report.self_vector_drift_hamming, report.audit_event_id,
@@ -408,7 +527,9 @@ async fn main() -> Result<()> {
         }
         Command::UnlearnSource { db, source, reason } => {
             let ag = open(&db, true).await?;
-            let report = ag.unlearn(UnlearnTarget::BySource(source.clone()), reason.clone()).await?;
+            let report = ag
+                .unlearn(UnlearnTarget::BySource(source.clone()), reason.clone())
+                .await?;
             println!(
                 "unlearned source '{}': episodes={}, beliefs={}, audit_event_id: {}",
                 source, report.episodes_removed, report.beliefs_removed, report.audit_event_id,
@@ -421,14 +542,23 @@ async fn main() -> Result<()> {
                 println!("(no tombstones)");
             }
             for t in tombs {
-                println!("kind={} id={} tombstoned={} reason={} audit={}",
-                    t.kind, t.id, t.tombstoned_at.to_rfc3339(), t.reason, t.audit_event_id);
+                println!(
+                    "kind={} id={} tombstoned={} reason={} audit={}",
+                    t.kind,
+                    t.id,
+                    t.tombstoned_at.to_rfc3339(),
+                    t.reason,
+                    t.audit_event_id
+                );
             }
         }
         Command::Restore { db, audit_event_id } => {
             let ag = open(&db, true).await?;
             let n = ag.restore_within_window(audit_event_id).await?;
-            println!("restored {} tombstones from audit event {}", n, audit_event_id);
+            println!(
+                "restored {} tombstones from audit event {}",
+                n, audit_event_id
+            );
         }
         // -- self-model ----------------------------------------------------
         Command::WhatDidILearn { db, since } => {
@@ -445,7 +575,12 @@ async fn main() -> Result<()> {
                 println!("(no learning events)");
             }
             for e in &events {
-                println!("[{}] {} — {}", e.timestamp().to_rfc3339(), e.kind_label(), summarize_event(e));
+                println!(
+                    "[{}] {} — {}",
+                    e.timestamp().to_rfc3339(),
+                    e.kind_label(),
+                    summarize_event(e)
+                );
             }
         }
         Command::SelfVector { db } => {
@@ -494,15 +629,54 @@ fn summarize_event(e: &agidb::LearningEvent) -> String {
     use agidb::LearningEvent;
     match e {
         LearningEvent::EpisodeStored { id, .. } => format!("episode {}", id.raw()),
-        LearningEvent::GoalSet { id, description, .. } => format!("goal {} — {}", id.raw(), description),
-        LearningEvent::GoalStateChanged { id, from, to, .. } => format!("goal {} {} → {}", id.raw(), from, to),
-        LearningEvent::BeliefAsserted { id, claim, confidence, .. } => format!("belief {} [{:.2}] — {}", id.raw(), confidence, claim),
-        LearningEvent::BeliefRevised { id, previous_confidence, new_confidence, .. } => format!("belief {} {:.2} → {:.2}", id.raw(), previous_confidence, new_confidence),
-        LearningEvent::BeliefWithdrawn { id, reason, .. } => format!("belief {} — {}", id.raw(), reason),
-        LearningEvent::SemanticAtomFormed { atom_id, evidence_count, .. } => format!("atom {} (evidence={})", atom_id.raw(), evidence_count),
+        LearningEvent::GoalSet {
+            id, description, ..
+        } => format!("goal {} — {}", id.raw(), description),
+        LearningEvent::GoalStateChanged { id, from, to, .. } => {
+            format!("goal {} {} → {}", id.raw(), from, to)
+        }
+        LearningEvent::BeliefAsserted {
+            id,
+            claim,
+            confidence,
+            ..
+        } => format!("belief {} [{:.2}] — {}", id.raw(), confidence, claim),
+        LearningEvent::BeliefRevised {
+            id,
+            previous_confidence,
+            new_confidence,
+            ..
+        } => format!(
+            "belief {} {:.2} → {:.2}",
+            id.raw(),
+            previous_confidence,
+            new_confidence
+        ),
+        LearningEvent::BeliefWithdrawn { id, reason, .. } => {
+            format!("belief {} — {}", id.raw(), reason)
+        }
+        LearningEvent::SemanticAtomFormed {
+            atom_id,
+            evidence_count,
+            ..
+        } => format!("atom {} (evidence={})", atom_id.raw(), evidence_count),
         LearningEvent::ContradictionDetected { count, .. } => format!("{} contradictions", count),
-        LearningEvent::ConsolidationRun { atoms_created, contradictions, .. } => format!("atoms={}, contradictions={}", atoms_created, contradictions),
-        LearningEvent::Unlearned { target, cascade_size, self_vector_drift, .. } => format!("target={}, cascade={}, sv_drift={}", target, cascade_size, self_vector_drift),
-        LearningEvent::SelfVectorUpdated { drift_hamming, .. } => format!("drift={}", drift_hamming),
+        LearningEvent::ConsolidationRun {
+            atoms_created,
+            contradictions,
+            ..
+        } => format!("atoms={}, contradictions={}", atoms_created, contradictions),
+        LearningEvent::Unlearned {
+            target,
+            cascade_size,
+            self_vector_drift,
+            ..
+        } => format!(
+            "target={}, cascade={}, sv_drift={}",
+            target, cascade_size, self_vector_drift
+        ),
+        LearningEvent::SelfVectorUpdated { drift_hamming, .. } => {
+            format!("drift={}", drift_hamming)
+        }
     }
 }

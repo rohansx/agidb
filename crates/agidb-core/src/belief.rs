@@ -146,7 +146,9 @@ impl Store {
         supports: bool,
         reason: impl Into<String>,
     ) -> Result<RevisionReport> {
-        let mut belief = self.get_belief(id)?.ok_or(AgidbError::UnknownBelief(id.raw()))?;
+        let mut belief = self
+            .get_belief(id)?
+            .ok_or(AgidbError::UnknownBelief(id.raw()))?;
         if belief.is_withdrawn() {
             return Err(AgidbError::InvalidGoalTransition(format!(
                 "belief {id} is withdrawn — no further revisions"
@@ -211,7 +213,9 @@ impl Store {
     /// valid-time closed, row + revision log preserved). Constitution
     /// article XVII.
     pub fn withdraw_belief(&mut self, id: BeliefId, reason: impl Into<String>) -> Result<()> {
-        let mut belief = self.get_belief(id)?.ok_or(AgidbError::UnknownBelief(id.raw()))?;
+        let mut belief = self
+            .get_belief(id)?
+            .ok_or(AgidbError::UnknownBelief(id.raw()))?;
         if belief.is_withdrawn() {
             return Ok(()); // idempotent
         }
@@ -344,7 +348,9 @@ impl Store {
     /// Merge an incoming `assert_belief` call into an existing belief:
     /// fold the new evidence in, revise confidence up, append a revision.
     fn merge_into_belief(&mut self, id: BeliefId, incoming: Belief) -> Result<BeliefId> {
-        let mut existing = self.get_belief(id)?.ok_or(AgidbError::UnknownBelief(id.raw()))?;
+        let mut existing = self
+            .get_belief(id)?
+            .ok_or(AgidbError::UnknownBelief(id.raw()))?;
         let previous = existing.confidence;
         let mut next = previous;
         for ev in &incoming.evidence {
@@ -359,7 +365,10 @@ impl Store {
             previous_confidence: previous,
             new_confidence: next,
             triggering_evidence: incoming.evidence.first().copied(),
-            reason: format!("re-asserted with {} evidence episodes", incoming.evidence.len()),
+            reason: format!(
+                "re-asserted with {} evidence episodes",
+                incoming.evidence.len()
+            ),
         };
         existing.revision_log.push(revision.clone());
         let seq = existing.revision_log.len() as u64 - 1;

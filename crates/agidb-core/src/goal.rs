@@ -118,7 +118,9 @@ impl Store {
     /// the HDC signature (parent context preserved). State transitions
     /// are validated; terminal goals reject every patch.
     pub fn revise_goal(&mut self, id: GoalId, patch: GoalPatch) -> Result<()> {
-        let mut goal = self.get_goal(id)?.ok_or(AgidbError::UnknownGoal(id.raw()))?;
+        let mut goal = self
+            .get_goal(id)?
+            .ok_or(AgidbError::UnknownGoal(id.raw()))?;
         if goal.state.is_terminal() {
             return Err(AgidbError::InvalidGoalTransition(format!(
                 "goal {} is in terminal state {:?} — no further transitions allowed",
@@ -168,7 +170,9 @@ impl Store {
     /// Transition a goal to `Completed`, attaching the evidence episodes
     /// that satisfied it. Terminal after this call.
     pub fn complete_goal(&mut self, id: GoalId, evidence: Vec<EpisodeId>) -> Result<()> {
-        let mut goal = self.get_goal(id)?.ok_or(AgidbError::UnknownGoal(id.raw()))?;
+        let mut goal = self
+            .get_goal(id)?
+            .ok_or(AgidbError::UnknownGoal(id.raw()))?;
         if goal.state.is_terminal() {
             return Err(AgidbError::InvalidGoalTransition(format!(
                 "goal {} is in terminal state {:?} — no further transitions allowed",
@@ -199,7 +203,9 @@ impl Store {
 
     /// Transition a goal to `Abandoned` with a reason. Terminal.
     pub fn abandon_goal(&mut self, id: GoalId, reason: impl Into<String>) -> Result<()> {
-        let mut goal = self.get_goal(id)?.ok_or(AgidbError::UnknownGoal(id.raw()))?;
+        let mut goal = self
+            .get_goal(id)?
+            .ok_or(AgidbError::UnknownGoal(id.raw()))?;
         if goal.state.is_terminal() {
             return Err(AgidbError::InvalidGoalTransition(format!(
                 "goal {} is in terminal state {:?} — no further transitions allowed",
@@ -230,7 +236,9 @@ impl Store {
 
     /// Pause an active goal with a reason.
     pub fn pause_goal(&mut self, id: GoalId, reason: impl Into<String>) -> Result<()> {
-        let mut goal = self.get_goal(id)?.ok_or(AgidbError::UnknownGoal(id.raw()))?;
+        let mut goal = self
+            .get_goal(id)?
+            .ok_or(AgidbError::UnknownGoal(id.raw()))?;
         if goal.state.is_terminal() {
             return Err(AgidbError::InvalidGoalTransition(format!(
                 "goal {} is in terminal state {:?} — no further transitions allowed",
@@ -267,7 +275,9 @@ impl Store {
 
     /// Resume a paused goal back to `Active`.
     pub fn resume_goal(&mut self, id: GoalId) -> Result<()> {
-        let mut goal = self.get_goal(id)?.ok_or(AgidbError::UnknownGoal(id.raw()))?;
+        let mut goal = self
+            .get_goal(id)?
+            .ok_or(AgidbError::UnknownGoal(id.raw()))?;
         if goal.state.is_terminal() {
             return Err(AgidbError::InvalidGoalTransition(format!(
                 "goal {} is in terminal state {:?} — no further transitions allowed",
