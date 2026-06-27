@@ -53,11 +53,7 @@ impl Store {
         // function: the agent attends to what it wants.
         let (goal_biased, active_goal_ids) = if query.goal_bias_weight > 0.0 {
             self.apply_goal_bias(&mut matches, query.goal_bias_weight)?;
-            let ids: Vec<GoalId> = self
-                .active_goals()?
-                .into_iter()
-                .map(|g| g.id)
-                .collect();
+            let ids: Vec<GoalId> = self.active_goals()?.into_iter().map(|g| g.id).collect();
             (!ids.is_empty(), ids)
         } else {
             (false, Vec::new())

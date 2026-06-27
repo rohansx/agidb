@@ -103,7 +103,8 @@ impl Store {
             let atom_sigs = self.load_atom_signatures()?;
             if !atom_sigs.is_empty() {
                 let bundle = crate::hdc::HV::bundle(&atom_sigs);
-                let _drift = self.update_self_vector(&bundle, crate::self_model::SELF_VECTOR_ALPHA)?;
+                let _drift =
+                    self.update_self_vector(&bundle, crate::self_model::SELF_VECTOR_ALPHA)?;
             }
         }
 

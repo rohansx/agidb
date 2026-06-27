@@ -11,12 +11,21 @@ async fn observe_recall_consolidate_round_trip() {
     let db = Agidb::open_with(cfg).await.expect("open");
 
     // text-only episodes still get gist signatures → tier C/D recall.
-    let id1 = db.observe("Sarah recommended Bawri in Bandra").await.unwrap();
-    let _id2 = db.observe("Sarah said Bawri is a thai place").await.unwrap();
+    let id1 = db
+        .observe("Sarah recommended Bawri in Bandra")
+        .await
+        .unwrap();
+    let _id2 = db
+        .observe("Sarah said Bawri is a thai place")
+        .await
+        .unwrap();
     assert_eq!(id1.raw(), 1);
 
     // constitution article VI: recall never returns the empty set.
-    let r = db.recall_cue("what thai place did sarah mention?").await.unwrap();
+    let r = db
+        .recall_cue("what thai place did sarah mention?")
+        .await
+        .unwrap();
     assert!(!r.matches.is_empty(), "recall must never return empty");
     // elapsed_ms is a u32 wall-clock measurement.
     let _ = r.elapsed_ms;

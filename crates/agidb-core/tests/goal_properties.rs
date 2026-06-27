@@ -66,14 +66,19 @@ fn complete_goal_is_terminal_and_blocks_further_transitions() {
         "terminal goal must reject revise"
     );
     let err = store.pause_goal(id, "x").unwrap_err();
-    assert!(matches!(err, agidb_core::AgidbError::InvalidGoalTransition(_)));
+    assert!(matches!(
+        err,
+        agidb_core::AgidbError::InvalidGoalTransition(_)
+    ));
 }
 
 #[test]
 fn abandon_goal_is_terminal() {
     let (mut store, _d) = fresh_store();
     let id = store.set_goal(Goal::new("deprecated idea")).expect("set");
-    store.abandon_goal(id, "no longer relevant").expect("abandon");
+    store
+        .abandon_goal(id, "no longer relevant")
+        .expect("abandon");
     let g = store.get_goal(id).expect("get").expect("present");
     assert!(matches!(g.state, GoalState::Abandoned { .. }));
     assert!(g.state.is_terminal());
@@ -98,7 +103,10 @@ fn pause_is_noop_when_already_paused() {
     let id = store.set_goal(Goal::new("g")).expect("set");
     store.pause_goal(id, "r1").expect("pause");
     let err = store.pause_goal(id, "r2").unwrap_err();
-    assert!(matches!(err, agidb_core::AgidbError::InvalidGoalTransition(_)));
+    assert!(matches!(
+        err,
+        agidb_core::AgidbError::InvalidGoalTransition(_)
+    ));
 }
 
 #[test]
@@ -117,7 +125,10 @@ fn revise_goal_updates_description_and_recomputes_signature() {
 
     let g = store.get_goal(id).unwrap().unwrap();
     assert_eq!(g.description, "revised description");
-    assert_ne!(g.signature_offset, before, "signature must move on recompute");
+    assert_ne!(
+        g.signature_offset, before,
+        "signature must move on recompute"
+    );
 }
 
 #[test]
@@ -133,7 +144,10 @@ fn parent_child_hierarchy_binds_parent_signature() {
     // The child signature is bind(bundle, parent) — not equal to the
     // parent, and not equal to a fresh child-without-parent signature.
     let orphan_id = store.set_goal(Goal::new("top level goal")).expect("set");
-    let orphan_sig = store.goal_signature(orphan_id).expect("read").expect("some");
+    let orphan_sig = store
+        .goal_signature(orphan_id)
+        .expect("read")
+        .expect("some");
     assert_ne!(parent_sig, child_sig);
     assert_ne!(orphan_sig, child_sig);
 }

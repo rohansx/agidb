@@ -40,18 +40,20 @@ use agidb_extract::{observe_text, Extractor};
 pub use agidb_core as core;
 pub use agidb_extract as extract;
 
+pub use agidb_core::belief::{self, revise_confidence, WITHDRAWAL_THRESHOLD};
 pub use agidb_core::consolidate::ConsolidationReport;
 pub use agidb_core::goal::{self, GoalStateKind};
-pub use agidb_core::belief::{self, revise_confidence, WITHDRAWAL_THRESHOLD};
 pub use agidb_core::hdc;
 pub use agidb_core::learning_log::{self, LearningEvent};
-pub use agidb_core::self_model::{self, hv_ema_update, hv_subtract, SelfVectorSnapshot, SELF_VECTOR_ALPHA};
+pub use agidb_core::self_model::{
+    self, hv_ema_update, hv_subtract, SelfVectorSnapshot, SELF_VECTOR_ALPHA,
+};
 pub use agidb_core::store::{Stats, StoreConfig};
 pub use agidb_core::types::{
-    Belief, BeliefId, BeliefRevision, Concept, ConceptId, Episode, EpisodeId, ExtractContext,
-    ExtractedTriple, Extraction, Entity, Goal, GoalId, GoalPatch, GoalState, Provenance, Query,
-    Recall, RecallMatch, RevisionReport, SemanticAtom, SemanticAtomId, SemanticMatch,
-    SuccessCriterion, Tier, TextExtractor, TimeRange, Triple,
+    Belief, BeliefId, BeliefRevision, Concept, ConceptId, Entity, Episode, EpisodeId,
+    ExtractContext, ExtractedTriple, Extraction, Goal, GoalId, GoalPatch, GoalState, Provenance,
+    Query, Recall, RecallMatch, RevisionReport, SemanticAtom, SemanticAtomId, SemanticMatch,
+    SuccessCriterion, TextExtractor, Tier, TimeRange, Triple,
 };
 pub use agidb_core::unlearn::{self, Tombstone, UnlearnReport, UnlearnTarget};
 pub use agidb_extract::{ExtractorConfig, ObserveContext};
@@ -373,7 +375,11 @@ impl Agidb {
     }
 
     /// Abandon a goal with a reason. Terminal.
-    pub async fn abandon_goal(&self, id: GoalId, reason: impl Into<String> + Send + 'static) -> CoreResult<()> {
+    pub async fn abandon_goal(
+        &self,
+        id: GoalId,
+        reason: impl Into<String> + Send + 'static,
+    ) -> CoreResult<()> {
         let store = self.store.clone();
         let reason = reason.into();
         tokio::task::spawn_blocking(move || {
@@ -385,7 +391,11 @@ impl Agidb {
     }
 
     /// Pause an active goal.
-    pub async fn pause_goal(&self, id: GoalId, reason: impl Into<String> + Send + 'static) -> CoreResult<()> {
+    pub async fn pause_goal(
+        &self,
+        id: GoalId,
+        reason: impl Into<String> + Send + 'static,
+    ) -> CoreResult<()> {
         let store = self.store.clone();
         let reason = reason.into();
         tokio::task::spawn_blocking(move || {
@@ -474,7 +484,11 @@ impl Agidb {
     }
 
     /// Withdraw a belief explicitly (non-destructive). Idempotent.
-    pub async fn withdraw_belief(&self, id: BeliefId, reason: impl Into<String> + Send + 'static) -> CoreResult<()> {
+    pub async fn withdraw_belief(
+        &self,
+        id: BeliefId,
+        reason: impl Into<String> + Send + 'static,
+    ) -> CoreResult<()> {
         let store = self.store.clone();
         let reason = reason.into();
         tokio::task::spawn_blocking(move || {
@@ -533,7 +547,11 @@ impl Agidb {
     // -- unlearn (phase 11) ----------------------------------------------
 
     /// Non-destructive cascading unlearn. Constitution article XVI.
-    pub async fn unlearn(&self, target: UnlearnTarget, reason: impl Into<String> + Send + 'static) -> CoreResult<UnlearnReport> {
+    pub async fn unlearn(
+        &self,
+        target: UnlearnTarget,
+        reason: impl Into<String> + Send + 'static,
+    ) -> CoreResult<UnlearnReport> {
         let store = self.store.clone();
         let reason = reason.into();
         tokio::task::spawn_blocking(move || {
@@ -569,7 +587,10 @@ impl Agidb {
     // -- self-model introspection (phase 10) ------------------------------
 
     /// Every learning event since `since` (the self-model audit log).
-    pub async fn what_did_i_learn(&self, since: chrono::DateTime<chrono::Utc>) -> CoreResult<Vec<LearningEvent>> {
+    pub async fn what_did_i_learn(
+        &self,
+        since: chrono::DateTime<chrono::Utc>,
+    ) -> CoreResult<Vec<LearningEvent>> {
         let store = self.store.clone();
         tokio::task::spawn_blocking(move || {
             let store = store.lock().expect("store mutex poisoned");

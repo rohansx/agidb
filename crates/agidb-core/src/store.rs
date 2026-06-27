@@ -9,7 +9,9 @@ use crate::hdc::{D_BYTES, HV};
 use crate::signatures::SignatureFile;
 use crate::types::*;
 use chrono::{DateTime, Duration, Utc};
-use redb::{Database, MultimapTableDefinition, ReadableTable, ReadableTableMetadata, TableDefinition};
+use redb::{
+    Database, MultimapTableDefinition, ReadableTable, ReadableTableMetadata, TableDefinition,
+};
 use roaring::RoaringBitmap;
 use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader, Write};

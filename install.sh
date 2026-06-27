@@ -137,9 +137,8 @@ EXPECTED=$(awk -v a="${ASSET}" '
 [ -n "$EXPECTED" ] || die "no checksum found for ${ASSET} in checksums.txt"
 
 cd "${WORK}"
-$SHACMD -c <<EOF
-${EXPECTED}  ${ASSET}
-EOF
+echo "${EXPECTED}  ${ASSET}" > check.sha256
+$SHACMD -c check.sha256
 
 # ─── unpack ───────────────────────────────────────────────────────
 log "extracting …"

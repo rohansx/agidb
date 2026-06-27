@@ -249,7 +249,10 @@ impl GoalState {
     /// `true` for `Completed` and `Abandoned` — no further transitions
     /// are allowed out of a terminal state.
     pub fn is_terminal(&self) -> bool {
-        matches!(self, GoalState::Completed { .. } | GoalState::Abandoned { .. })
+        matches!(
+            self,
+            GoalState::Completed { .. } | GoalState::Abandoned { .. }
+        )
     }
 
     /// `true` iff the goal is currently biasing recall (only `Active`).
@@ -417,7 +420,12 @@ impl Belief {
     /// shape so `what_do_i_believe(subject)` can find it. Subjects and
     /// objects are matched case-sensitively against canonical concept
     /// names (same convention as tier-A recall).
-    pub fn with_triple(mut self, subject: impl Into<String>, predicate: impl Into<String>, object: impl Into<String>) -> Self {
+    pub fn with_triple(
+        mut self,
+        subject: impl Into<String>,
+        predicate: impl Into<String>,
+        object: impl Into<String>,
+    ) -> Self {
         self.subject = subject.into();
         self.predicate = predicate.into();
         self.object = object.into();
